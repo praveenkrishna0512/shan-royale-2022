@@ -54,6 +54,13 @@ class DBHelper:
         stmt = """SELECT username FROM playerData"""
         return [x[0] for x in self.conn.execute(stmt)]
 
+    # Points queries
+    def updateRound1Points(self, username, points):
+        stmt = """UPDATE playerData SET pointsRound1 = (?) WHERE username = (?)"""
+        args = (points, username, )
+        self.conn.execute(stmt, args)
+        self.conn.commit()
+
     # Session queries
 
     def setSession(self, username, state):
