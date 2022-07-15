@@ -6,7 +6,6 @@ from click import option
 from env import get_api_key, get_port
 import telebot
 from telebot import types
-import telegram
 from telegram import CallbackQuery, ParseMode
 import ast
 from dbhelper import DBHelper
@@ -15,7 +14,7 @@ PORT = get_port()
 API_KEY = get_api_key()
 if API_KEY == None:
     raise Exception("Please update API Key")
-    
+
 
 # -----------------------------------------------------------------------------------------------------
 # Enable logging
