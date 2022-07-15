@@ -15,6 +15,7 @@ PORT = get_port()
 API_KEY = get_api_key()
 if API_KEY == None:
     raise Exception("Please update API Key")
+    
 
 # -----------------------------------------------------------------------------------------------------
 # Enable logging
@@ -50,7 +51,7 @@ def makeTimeInlineKeyboard(lst, optionID, dayPicked):
 # Command Handlers
 def start(update, context):
     """Send a message when the command /start is issued."""
-    txt1 = "Hi! Welcome to GymTogether\n\n"
+    txt1 = "Hi! Welcome to the Shan Royale Bot\n\n"
     txt2 = "Type <b>/help</b> for more info\n"
     fullText = txt1 + txt2
     update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
@@ -58,9 +59,9 @@ def start(update, context):
 def help(update, context):
     """Send a message when the command /help is issued."""
     txt1 = "Here are the suppported individual commands:\n"
-    txt2 = "<b>/schedule</b> - Begin scheduling your gym slots for this/next week\n\n"
-    txt3 = "Here are the support group commands:\n"
-    txt4 = "<b>/see</b> - See the current schedule"
+    txt2 = "<b>/setpoints</b> - Set your points for the rounds in Shan Royale\n\n"
+    txt3 = "Here are the support admin commands:\n"
+    txt4 = "<b>/allpoints</b> - See points of all players"
     fullText = txt1 + txt2 + txt3 + txt4
     update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
 

@@ -7,7 +7,7 @@ nextWeekString = "Next Week"
 
 class DBHelper:
     
-    def __init__(self, dbname="userData.sqlite"):
+    def __init__(self, dbname="shan-royale.sqlite"):
         self.dbname = dbname
         self.conn = sqlite3.connect(dbname)
 
@@ -16,12 +16,23 @@ class DBHelper:
     # 0 means not available, 1 means available
     # The 8 bits represent these timeslots in this order: 7am, 9am, 11am, 1pm, 3pm, 5pm, 7pm, 9pm
     def setup(self):
-        stmt = """CREATE TABLE IF NOT EXISTS userData ( 
-                        username TEXT PRIMARY KEY,
-                        inSession INTEGER DEFAULT 0,
-                        P
-                        )"""
-        self.conn.execute(stmt)
+        playerDataStmt = """CREATE TABLE IF NOT EXISTS playerData ( 
+            username TEXT PRIMARY KEY,
+            faction INTEGER DEFAULT 0,
+            pointsRound1 INTEGER DEFAULT 0,
+            pointsRound2 INTEGER DEFAULT 0,
+            pointsRound3 INTEGER DEFAULT 0,
+            deathCount INTEGER DEFAULT 0,
+            killCount INTEGER DEFAULT 0
+        )"""
+        factionDataStmt = """CREATE TABLE IF NOT EXISTS factionData ( 
+            faction INTEGER DEFAULT 0 PRIMARY KEY,
+            bank INTEGER DEFAULT 0,
+            enemyFaction INTEGER DEFAULT 0,
+            pointsAssigned INTEGER DEFAULT 0
+        )"""
+        self.conn.execute(playerDataStmt)
+        self.conn.execute(factionDataStmt)
         self.conn.commit()
 
     # Username Queries
