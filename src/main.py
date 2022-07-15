@@ -1,6 +1,8 @@
 from calendar import weekday
+import enum
 import logging
 import this
+from tracemalloc import BaseFilter
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 from click import option
 from env import get_api_key, get_port
@@ -16,7 +18,7 @@ if API_KEY == None:
     raise Exception("Please update API Key")
 
 
-# -----------------------------------------------------------------------------------------------------
+# ------------------------------Constants--------------------------------------------
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
@@ -26,8 +28,27 @@ logger = logging.getLogger(__name__)
 # Initialise bot
 bot = telebot.TeleBot(API_KEY, parse_mode = None)
 
+# Possible optionIDs
+class StateEnum(enum.Enum):
+    setPoints1 = "setPoints1"
+    setPoints2 = "setPoints2"
+    setPoints3 = "setPoints3"
+
+# Handles state of the bot for each user
+# Key: username
+# Value: dynamic dictionary
+userTracker = {}
+
+#============================Key boards===================================
 # Makes Inline Keyboard
-# TODO Change callbakc_data values
+def makeInlineKeyboard(lst, optionID):
+    markup = types.keybo
+    for key, value in lst.items():
+        markup.add(types.InlineKeyboardButton(text = value,
+                                            callback_data = "['optionID', '" + optionID + "', 'value', '" + value + "']"))
+    return markup
+
+# Makes Inline Keyboard
 def makeInlineKeyboard(lst, optionID):
     markup = types.InlineKeyboardMarkup()
     for key, value in lst.items():
@@ -44,10 +65,12 @@ def makeTimeInlineKeyboard(lst, optionID, dayPicked):
                                             callback_data = "['optionID', '" + optionID + "', 'value', '" + value + "', 'day', '" + dayPicked + "']"))
     return markup
 
-# TODO: DB to main file converters
+#============================DB to file converters?===========================
+# TODO: DB to main file converters (maybe put in dbhelper.py)
 
 
-# Command Handlers
+#========================Command Handlers==================================
+# Sends start command and registers new usernames
 def start(update, context):
     username = update.message.chat.username
     txt1 = "Hi! Welcome to the Shan Royale Bot\n"
@@ -59,8 +82,14 @@ def start(update, context):
 
     # Create database (this is required to ensure multiple ppl dont use the same db object)
     db = DBHelper("shan-royale.sqlite")
-    db.setup()
-    db.handleUsername(username)
+    userExists = db.handleUsername(username)
+    # Add new user to userTracker
+    if username not in userTracker.keys():
+        newUserTracker = {
+            "state": None
+        }
+        userTracker[username] = newUserTracker
+    print("User Tracker: " + str(userTracker))
 
 def help(update, context):
     """Send a message when the command /help is issued."""
@@ -71,24 +100,35 @@ def help(update, context):
     fullText = txt1 + txt2 + txt3 + txt4
     update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
 
-def mainCallBackHandler(update, context):
-    dataClicked = ast.literal_eval(update.callback_query.data)
-    optionID = dataClicked[1]
-    value = dataClicked[3]
-    user = update.callback_query.message.chat.username
+def setpoints(update, context):
+    # Create database (this is required to ensure multiple ppl dont use the same db object)
+    db = DBHelper("shan-royale.sqlite")
+    username = update.message.chat.username
+    fullText = """Type in the points allocated to you in <b>Round 1</b>\n
+Take Note:<em>
+- Everyone must be allocated at least <b>5 points</b>
+- <b>Do not exceed</b> your total team points of 200!
+</em>
+"""
+    bot.send_message(chat_id = update.message.chat.id,
+        text = fullText,
+        parse_mode = 'HTML')
 
-def stop(update, context):
-    """Stops"""
-    update.message.reply_text(update.message.text)
-
-def echo(update, context):
-    """Echo the user message."""
-    update.message.reply_text(update.message.text)
 
 def error(update, context):
     """Log Errors caused by Updates."""
     logger.warning('Update "%s" caused error "%s"', update, context.error)
 
+
+#===================Message and Callback Handlers==============================
+def mainMessageHandler(update, context):
+    print(update)
+    # dataClicked = ast.literal_eval(update.callback_query.data)
+    # optionID = dataClicked[1]
+    # value = dataClicked[3]
+    # user = update.callback_query.message.chat.username
+
+#===================Main Method============================
 def main():
     # Start the bot.
     # Create the Updater and pass it your bot's token.
@@ -102,9 +142,10 @@ def main():
     # on different commands - answer in Telegram
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("help", help))
+    dp.add_handler(CommandHandler("setpoints", setpoints))
 
-    # Handle all callback
-    dp.add_handler(CallbackQueryHandler(callback=mainCallBackHandler, pattern=str))
+    # Handle all messages
+    dp.add_handler(MessageHandler(callback=mainMessageHandler, filters=Filters.all))
 
 
     # log all errors

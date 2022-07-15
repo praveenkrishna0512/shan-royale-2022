@@ -3,9 +3,8 @@ from dbhelper import DBHelper
 db = DBHelper("shan-royale.sqlite")
 
 def main():
-    db.addUsername("@praveeeenk")
-    db.handleUsername("@praveeeenk")
-    print(db.getAllUsernames())
+    db.handleUsername("praveeeenk")
+    print(db.getPlayerData("praveeeenk"))
 
 if __name__ == '__main__':
     main()

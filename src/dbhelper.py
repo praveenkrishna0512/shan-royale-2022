@@ -33,8 +33,7 @@ class DBHelper:
         self.conn.execute(factionDataStmt)
         self.conn.commit()
 
-    # Username Queries
-
+    # Username Queries (Returns True if user exists)
     def handleUsername(self, username):
         stmt = """SELECT * FROM playerData WHERE username = (?)"""
         args = (username, )
@@ -42,6 +41,8 @@ class DBHelper:
         if len(queryReturn) == 0:
             print("Adding new username: " + username)
             self.__addUsername(username)
+            return False
+        return True
 
     def __addUsername(self, username):
         stmt = "INSERT INTO playerData (username) VALUES (?)"
@@ -94,12 +95,16 @@ class DBHelper:
         if state == 2:
             return nextWeekString
 
-    # Get All User Data
+    # Get One User Data
 
-    def getAllplayerData(self, username):
+    def getPlayerData(self, username):
         stmt = "SELECT * FROM playerData WHERE username = (?)"
-        args = (username, )
-        return self.conn.execute(stmt, args)
+        args = (username,)
+        data = []
+        for x in self.conn.execute(stmt, args):
+            for i in range(0, len(x)):
+                data.append(x[i])
+        return data
 
     # Purge data queries
 
