@@ -49,11 +49,18 @@ def makeTimeInlineKeyboard(lst, optionID, dayPicked):
 
 # Command Handlers
 def start(update, context):
-    """Send a message when the command /start is issued."""
-    txt1 = "Hi! Welcome to the Shan Royale Bot\n\n"
-    txt2 = "Type <b>/help</b> for more info\n"
-    fullText = txt1 + txt2
+    username = update.message.chat.username
+    txt1 = "Hi! Welcome to the Shan Royale Bot\n"
+    txt2 = "Type <b>/help</b> for more info\n\n"
+    txt3 = "Registered username: " + username + "\n\n"
+    txt4 = "IMPT: Please <b>do NOT change your username</b> after starting the bot"
+    fullText = txt1 + txt2 + txt3 + txt4
     update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
+
+    # Create database (this is required to ensure multiple ppl dont use the same db object)
+    db = DBHelper("shan-royale.sqlite")
+    db.setup()
+    db.handleUsername(username)
 
 def help(update, context):
     """Send a message when the command /help is issued."""
@@ -69,11 +76,6 @@ def mainCallBackHandler(update, context):
     optionID = dataClicked[1]
     value = dataClicked[3]
     user = update.callback_query.message.chat.username
-
-    # Create database (this is required to ensure multiple ppl dont use the same db object)
-    db = DBHelper("userData.sqlite")
-    db.setup()
-    db.handleUsername(user)
 
 def stop(update, context):
     """Stops"""

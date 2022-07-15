@@ -10,11 +10,9 @@ class DBHelper:
     def __init__(self, dbname="shan-royale.sqlite"):
         self.dbname = dbname
         self.conn = sqlite3.connect(dbname)
+        self.setup()
 
-    # Timeslot Availability is captured in 16 bits for each day
-    # First 8 bits represent this week, Last 8 bits represent next week
-    # 0 means not available, 1 means available
-    # The 8 bits represent these timeslots in this order: 7am, 9am, 11am, 1pm, 3pm, 5pm, 7pm, 9pm
+    
     def setup(self):
         playerDataStmt = """CREATE TABLE IF NOT EXISTS playerData ( 
             username TEXT PRIMARY KEY,
@@ -38,20 +36,21 @@ class DBHelper:
     # Username Queries
 
     def handleUsername(self, username):
-        stmt = """SELECT * FROM userData WHERE username = (?)"""
+        stmt = """SELECT * FROM playerData WHERE username = (?)"""
         args = (username, )
         queryReturn = [x[0] for x in self.conn.execute(stmt, args)]
         if len(queryReturn) == 0:
+            print("Adding new username: " + username)
             self.__addUsername(username)
 
     def __addUsername(self, username):
-        stmt = "INSERT INTO userData (username) VALUES (?)"
+        stmt = "INSERT INTO playerData (username) VALUES (?)"
         args = (username, )
         self.conn.execute(stmt, args)
         self.conn.commit()
 
     def getAllUsernames(self):
-        stmt = """SELECT username FROM userData"""
+        stmt = """SELECT username FROM playerData"""
         return [x[0] for x in self.conn.execute(stmt)]
 
     # Session queries
@@ -60,7 +59,7 @@ class DBHelper:
         # STATES (encoding - value passed in)
         # 0 - not amending, 1 - this week, 2 - next week
         inSession = self.determineSession(state)
-        stmt2 = """UPDATE userData SET inSession = (?) WHERE username = (?)"""
+        stmt2 = """UPDATE playerData SET inSession = (?) WHERE username = (?)"""
         args2 = (inSession, username, )
         self.conn.execute(stmt2, args2)
         self.conn.commit()
@@ -83,7 +82,7 @@ class DBHelper:
         return currSession
 
     def getSessionHelper(self, username):
-        stmt = """SELECT inSession FROM userData WHERE username = (?)"""
+        stmt = """SELECT inSession FROM playerData WHERE username = (?)"""
         args = (username, )
         state = -1
         for x in self.conn.execute(stmt, args):
@@ -97,14 +96,14 @@ class DBHelper:
 
     # Get All User Data
 
-    def getAllUserData(self, username):
-        stmt = "SELECT * FROM userData WHERE username = (?)"
+    def getAllplayerData(self, username):
+        stmt = "SELECT * FROM playerData WHERE username = (?)"
         args = (username, )
         return self.conn.execute(stmt, args)
 
     # Purge data queries
 
-    def purgeUserData(self):
-        stmt = "DELETE FROM userData"
+    def purgeplayerData(self):
+        stmt = "DELETE FROM playerData"
         self.conn.execute(stmt)
         self.conn.commit()
