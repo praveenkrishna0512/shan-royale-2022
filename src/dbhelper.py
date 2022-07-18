@@ -144,7 +144,32 @@ class DBHelper:
         for x in self.conn.execute(stmt, args):
             return x[0]
 
+    def getFactionMemberUsernames(self, faction, round_num):
+        stmt = f"SELECT username FROM {self.playerTable}{round_num} WHERE faction = (?)"
+        args = (faction, )
+        factionMembers = []
+        for x in self.conn.execute(stmt, args):
+            factionMembers.append(x[0])
+        return factionMembers
+
     # =============================Points queries=================================
+    def getFactionMemberPoints(self, faction, round_num):
+        factionMembers = self.getFactionMemberUsernames(faction, round_num)
+        factionMemberPointsMap = {}
+        for username in factionMembers:
+            points = self.getRoundPoints(username, round_num)
+            factionMemberPointsMap[username] = points
+        return factionMemberPointsMap
+    
+    def getRoundPoints(self, username, round_num):
+        if int(round_num) !=1 and int(round_num) != 2:
+            print(f"wrong num of rounds indiciated: {round_num}")
+            return
+        stmt = f"""SELECT points FROM {self.playerTable}{round_num} WHERE username = (?)"""
+        args = (username, )
+        for x in self.conn.execute(stmt, args):
+            return x[0]
+    
     def updateRoundPoints(self, username, points, round_num):
         if int(round_num) !=1 and int(round_num) != 2:
             print(f"wrong num of rounds indiciated: {round_num}")

@@ -3,6 +3,7 @@ import enum
 import json
 import logging
 from os import kill
+from tabnanny import check
 import this
 from tracemalloc import BaseFilter
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
@@ -137,10 +138,8 @@ def getTargetFaction(username):
 
 #===========================Set points==============================
 def promptSetPoints(update, context):
-    if (not currentGame.play) or currentGame.killEnabled:
-        bot.send_message(chat_id = update.message.chat.id,
-            text = dontWasteMyTimeText,
-            parse_mode = 'HTML')
+    setPointsPhase = checkSetPointsPhase(update, context)
+    if not setPointsPhase:
         return
 
     username = update.message.chat.username
@@ -156,7 +155,14 @@ Take Note:<em>
         text = fullText,
         parse_mode = 'HTML')
 
-def handleSetPoints(chat_id, username, text):
+def handleSetPoints(update, context, text):
+    chat_id = update.message.chat.id
+    username = update.message.chat.username
+    text = update.message.text
+    setPointsPhase = checkSetPointsPhase(update, context)
+    if not setPointsPhase:
+        return
+
     points = int(text)
     invalid = invalidPoints(chat_id, points)
     if invalid: 
@@ -171,7 +177,24 @@ Click <b>/setpoints</b> again to <b>reset</b> points for this round!
     bot.send_message(chat_id = chat_id,
         text = fullText,
         parse_mode = 'HTML')
-    return
+    
+    setState(username, None)
+
+def handleListPoints(update, context):
+    username = update.message.chat.username
+    userDb = userTracker[username]["db"]
+    playerFaction = userDb.getPlayerFaction(username, currentGame.currentRound)
+    factionMembersPointsMap = userDb.getFactionMemberPoints(playerFaction, currentGame.currentRound)
+
+    txt1 = "Here are the points for your faction members\n"
+    txt2 = ""
+    for username, points in factionMembersPointsMap.items():
+        txt2 += f"\n@{username}: {points}pts"
+    fullText = txt1 + txt2
+
+    bot.send_message(chat_id = update.message.chat.id,
+        text = fullText,
+        parse_mode = 'HTML')
 
 def invalidPoints(chat_id, points):
     #TODO ADD CHECKS FOR TEAM POINTS TOO!
@@ -222,7 +245,9 @@ Please contact @praveeeenk if the problem persists."""
 def help(update, context):
     """Send a message when the command /help is issued."""
     txt1 = "Here are the suppported individual commands:\n"
-    txt2 = """<b>/setpoints</b> - Set/Reset your points for current round in Shan Royale\n\n"""
+    txt2 = """<b>/setpoints</b> - Set/Reset your points for current round in Shan Royale
+<b>/listpoints</b> - List your faction members' points for current round in Shan Royale
+\n"""
     txt3 = "Here are the support admin commands:\n"
     txt4 = "<b>/adminBeginRound</b> - Begin the round!"
     fullText = txt1 + txt2 + txt3 + txt4
@@ -234,13 +259,12 @@ def error(update, context):
 
 #===================Message and Callback Handlers==============================
 def mainMessageHandler(update, context):
-    chat_id = update.message.chat.id
     username = update.message.chat.username
     text = update.message.text
     currentState = userTracker[username]["state"]
     match currentState:
         case StateEnum.setPoints:
-            handleSetPoints(chat_id, username, text)
+            handleSetPoints(update, context)
             return
         case _:
             print(f'ERROR IN MSGHANDLER: No such state defined ({currentState})\nText: {text}')
@@ -258,6 +282,23 @@ def mainCallBackHandler(update, context):
     else:
         print(f'ERROR IN CALLBACKHANDLER: No such optionID defined ({optionID})\nValue: {value}')
         return
+
+#=========================Game Phase Checkers=========================
+def checkSetPointsPhase(update, context):
+    if (not currentGame.play) or currentGame.killEnabled:
+        bot.send_message(chat_id = update.message.chat.id,
+            text = dontWasteMyTimeText,
+            parse_mode = 'HTML')
+        return False
+    return True
+
+def checkKillingPhase(update, context):
+    if (not currentGame.play) or (not currentGame.killEnabled):
+        bot.send_message(chat_id = update.message.chat.id,
+            text = dontWasteMyTimeText,
+            parse_mode = 'HTML')
+        return False
+    return True
 
 #=========================Authentication helpers=======================
 def checkAdmin(username):
@@ -301,6 +342,7 @@ def main():
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("help", help))
     dp.add_handler(CommandHandler("setpoints", promptSetPoints))
+    dp.add_handler(CommandHandler("listpoints", handleListPoints))
 
     # Handle all messages
     dp.add_handler(MessageHandler(callback=mainMessageHandler, filters=Filters.all))
