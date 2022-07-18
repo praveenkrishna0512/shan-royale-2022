@@ -1,3 +1,4 @@
+from game import Game
 from dbhelper import DBHelper
 
 db = DBHelper("shan-royale.sqlite")

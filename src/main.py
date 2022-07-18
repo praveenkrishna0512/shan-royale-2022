@@ -11,6 +11,8 @@ from telebot import types
 from telegram import CallbackQuery, ParseMode
 import ast
 from dbhelper import DBHelper
+from game import Game
+import adminCommands as adminCmd
 
 PORT = get_port()
 API_KEY = get_api_key()
@@ -29,13 +31,25 @@ bot = telebot.TeleBot(API_KEY, parse_mode = None)
 #============================Constants======================================
 minPoints = 5
 maxTeamPoints = 200
+roundList = [1, 2]
+
+currentGame = Game(1)
+
+admins = ["praveeeenk"]
+gameMasters = ["praveeeenk"]
+safetyOfficers = ["praveeeenk"]
+
+#=============================Texts==========================================
+dontWasteMyTimeText = """<b>Don't waste my time...</b>\n
+~ Message by Caserplz"""
 
 #============================Tracking State===================================
-# Possible optionIDs
+# Possible states
 class StateEnum(enum.Enum):
-    setPoints1 = "setPoints1"
-    setPoints2 = "setPoints2"
-    setPoints3 = "setPoints3"
+    setPoints = "setPoints"
+
+class OptionIDEnum(enum.Enum):
+    beginRound = "beginRound"
 
 # Handles state of the bot for each user
 # Key: username
@@ -49,32 +63,103 @@ def setState(username, state):
 #============================Key boards===================================
 # Makes Inline Keyboard
 def makeInlineKeyboard(lst, optionID):
-    markup = types.keybo
-    for key, value in lst.items():
-        markup.add(types.InlineKeyboardButton(text = value,
-                                            callback_data = "['optionID', '" + optionID + "', 'value', '" + value + "']"))
-    return markup
-
-# Makes Inline Keyboard
-def makeInlineKeyboard(lst, optionID):
     markup = types.InlineKeyboardMarkup()
-    for key, value in lst.items():
+    for value in lst:
         markup.add(types.InlineKeyboardButton(text = value,
-                                            callback_data = "['optionID', '" + optionID + "', 'value', '" + value + "']"))
-    return markup
-
-# Specific Inline Keyboard for showing time slots
-# TODO Change callbakc_data values
-def makeTimeInlineKeyboard(lst, optionID, dayPicked):
-    markup = types.InlineKeyboardMarkup()
-    for key, value in lst.items():
-        markup.add(types.InlineKeyboardButton(text = value,
-                                            callback_data = "['optionID', '" + optionID + "', 'value', '" + value + "', 'day', '" + dayPicked + "']"))
+                                            callback_data = f"['optionID', '{optionID}', 'value', '{value}']"))
     return markup
 
 #============================DB to file converters?===========================
 # TODO: DB to main file converters (maybe put in dbhelper.py)
 
+# ====================== Admin Commands ===============================
+def adminBeginRound(update, context):
+    username = update.message.chat.username
+    isAdmin = checkAdmin(username)
+    if not isAdmin:
+        bot.send_message(chat_id = update.message.chat.id,
+                     text = dontWasteMyTimeText,
+                     parse_mode = 'HTML')
+        return
+
+    text = """You are about to begin a round!\n
+Which round to you want to begin?"""
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = text,
+                     reply_markup = makeInlineKeyboard(roundList, OptionIDEnum.beginRound),
+                     parse_mode = 'HTML')
+
+def handleAdminBeginRound(update, context, round_no):
+    global currentGame
+    currentGame = adminCmd.adminBeginGame(round_no)
+    print(currentGame.toString())
+
+    adminText = f"""Thanks sir! Round {round_no} has begun!!"""
+    bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
+                     text = adminText,
+                     message_id = update.callback_query.message.message_id,
+                     parse_mode = 'HTML')
+
+    for user in userTracker.values():
+        # TODO Add in pic of play area
+        # TODO Input target faction
+        text = f"""<b>NOTICE</b>
+Round {round_no} has begun!!\n
+Details of game:
+- Duration: 45 mins
+- Your target Faction is <b>NEED TO CHANGE THIS</b>
+- Picture of play area is attached!
+
+Stay safe while playing! Don't run on stairs + high areas and not into people. Remember that this is <b>just a game</b>\n
+Enjoy!"""
+        bot.send_message(chat_id = user["chat_id"],
+                     text = text,
+                     parse_mode = 'HTML')
+
+#===========================Set points==============================
+def promptSetPoints(update, context):
+    username = update.message.chat.username
+    setState(username, StateEnum.setPoints)
+
+    fullText = f"""Type in the points allocated to you in <b>Round {currentGame.currentRound}</b>\n
+Take Note:<em>
+- Everyone must be allocated at least <b>5 points</b>
+- <b>Do not exceed</b> your total team points of 200!
+</em>
+"""
+    bot.send_message(chat_id = update.message.chat.id,
+        text = fullText,
+        parse_mode = 'HTML')
+
+def handleSetPoints(chat_id, username, text):
+    points = int(text)
+    invalid = invalidPoints(chat_id, points)
+    if invalid: 
+        return
+
+    db = userTracker[username]["db"]
+    db.updateRoundPoints(username, points)
+
+    fullText = f"""Allocated {points} points to you for <b>Round {currentGame.currentRound}</b>\n\n
+Click <b>/setpoints</b> again to <b>reset</b> points for this round!
+"""
+    bot.send_message(chat_id = chat_id,
+        text = fullText,
+        parse_mode = 'HTML')
+    return
+
+def invalidPoints(chat_id, points):
+    #TODO ADD CHECKS FOR TEAM POINTS TOO!
+    if points >= minPoints:
+        return False
+
+    fullText = f"""Too little points for <b>Round {currentGame.currentRound}</b>!
+Everyone must be allocated at least <b>5 points</b>.\n
+Please enter your points for this round again"""
+    bot.send_message(chat_id = chat_id,
+        text = fullText,
+        parse_mode = 'HTML')
+    return True
 
 #========================Command Handlers==================================
 # Sends start command and registers new usernames
@@ -89,12 +174,13 @@ def start(update, context):
 
     # Create database (this is required to ensure multiple ppl dont use the same db object)
     db = DBHelper("shan-royale.sqlite")
-    userExists = db.handleUsername(username)
+    userExists = db.handleUsername(username, currentGame.currentRound)
     # Add new user to userTracker
     if username not in userTracker.keys():
         newUserTracker = {
             "state": None,
-            "db": db
+            "db": db,
+            "chat_id": update.message.chat.id
         }
         userTracker[username] = newUserTracker
     print("User Tracker: " + str(userTracker))
@@ -102,100 +188,66 @@ def start(update, context):
 def help(update, context):
     """Send a message when the command /help is issued."""
     txt1 = "Here are the suppported individual commands:\n"
-    txt2 = """<b>/setpoints1</b> - Set/Reset your points for Round 1 in Shan Royale
-<b>/setpoints2</b> - Set/Reset your points for Round 2 in Shan Royale\n\n"""
+    txt2 = """<b>/setpoints</b> - Set/Reset your points for current round in Shan Royale\n\n"""
     txt3 = "Here are the support admin commands:\n"
-    txt4 = "<b>/allpoints</b> - See points of all players"
+    txt4 = "<b>/adminBeginRound</b> - Begin the round!"
     fullText = txt1 + txt2 + txt3 + txt4
     update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
-
-def promptSetPoints1(update, context):
-    username = update.message.chat.username
-    setState(username, StateEnum.setPoints1)
-
-    fullText = """Type in the points allocated to you in <b>Round 1</b>\n
-Take Note:<em>
-- Everyone must be allocated at least <b>5 points</b>
-- <b>Do not exceed</b> your total team points of 200!
-</em>
-"""
-    bot.send_message(chat_id = update.message.chat.id,
-        text = fullText,
-        parse_mode = 'HTML')
 
 def error(update, context):
     """Log Errors caused by Updates."""
     logger.warning('Update "%s" caused error "%s"', update, context.error)
 
 #===================Message and Callback Handlers==============================
-def handleSetPoints1(chat_id, username, text):
-    points = int(text)
-    invalid = invalidPoints(chat_id, points, round_no=1)
-    if invalid: 
-        return
-
-    db = userTracker[username]["db"]
-    db.updateRoundPoints(username, points, round_no=1)
-
-    fullText = f"""Allocated {points} points to you for <b>Round 1</b>\n
-Click <b>/setpoints1</b> again to <b>reset</b> points for Round 1!\n
-Click <b>/setpoints2</b> to set points for Round 2!
-"""
-    bot.send_message(chat_id = chat_id,
-        text = fullText,
-        parse_mode = 'HTML')
-    return
-
-def handleSetPoints2(chat_id, username, text):
-    points = int(text)
-    invalid = invalidPoints(chat_id, points, round_no=2)
-    if invalid: 
-        return
-
-    db = userTracker[username]["db"]
-    db.updateRoundPoints(username, points, round_no=2)
-
-    fullText = f"""Allocated {points} points to you for <b>Round 2</b>\n
-Click <b>/setpoints2</b> again to <b>reset</b> points for Round 2!
-"""
-    bot.send_message(chat_id = chat_id,
-        text = fullText,
-        parse_mode = 'HTML')
-    return
-
 def mainMessageHandler(update, context):
     chat_id = update.message.chat.id
     username = update.message.chat.username
     text = update.message.text
     currentState = userTracker[username]["state"]
     match currentState:
-        case StateEnum.setPoints1:
-            handleSetPoints1(chat_id, username, text)
-            return
-        case StateEnum.setPoints2:
-            handleSetPoints2(chat_id, username, text)
+        case StateEnum.setPoints:
+            handleSetPoints(chat_id, username, text)
             return
         case _:
             print(f'ERROR IN MSGHANDLER: No such state defined ({currentState})')
             return
-    # dataClicked = ast.literal_eval(update.callback_query.data)
-    # optionID = dataClicked[1]
-    # value = dataClicked[3]
-    # user = update.callback_query.message.chat.username
+
+def mainCallBackHandler(update, context):
+    dataClicked = ast.literal_eval(update.callback_query.data)
+    optionID = dataClicked[1]
+    value = dataClicked[3]
+    username = update.callback_query.message.chat.username
+
+    if optionID == str(OptionIDEnum.beginRound):
+        handleAdminBeginRound(update, context, value)
+        return
+    else:
+        print(f'ERROR IN CALLBACKHANDLER: No such optionID defined ({optionID})')
+        return
+
+#=========================Authentication helpers=======================
+def checkAdmin(username):
+    if username in admins:
+        return True
+    return False
+
+def checkGameMaster(username):
+    if username in gameMasters:
+        return True
+    return False
+
+def checkSafety(username):
+    if username in safetyOfficers:
+        return True
+    return False
 
 #====================Other helpers=========================
-def invalidPoints(chat_id, points, round_no):
-    #TODO ADD CHECKS FOR TEAM POINTS TOO!
-    if points >= minPoints:
-        return False
 
-    fullText = f"""Too little points for <b>Round {round_no}</b>!
-Everyone must be allocated at least <b>5 points</b>.\n
-Please enter your points for this round again"""
-    bot.send_message(chat_id = chat_id,
-        text = fullText,
-        parse_mode = 'HTML')
-    return True
+def blastMessageToAll(text):
+    for user in userTracker.values():
+        bot.send_message(chat_id = user["chat_id"],
+                     text = text,
+                     parse_mode = 'HTML')
 
 #===================Main Method============================
 def main():
@@ -208,13 +260,19 @@ def main():
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
 
-    # on different commands - answer in Telegram
+    # Admin commands
+    dp.add_handler(CommandHandler("adminBeginRound", adminBeginRound))
+
+    # Player commands
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("help", help))
-    dp.add_handler(CommandHandler("setpoints1", promptSetPoints1))
+    dp.add_handler(CommandHandler("setpoints", promptSetPoints))
 
     # Handle all messages
     dp.add_handler(MessageHandler(callback=mainMessageHandler, filters=Filters.all))
+
+    # Handle all callback
+    dp.add_handler(CallbackQueryHandler(callback=mainCallBackHandler, pattern=str))
 
 
     # log all errors
