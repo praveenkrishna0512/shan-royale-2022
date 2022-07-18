@@ -1,6 +1,8 @@
 from calendar import weekday
 import enum
+import json
 import logging
+from os import kill
 import this
 from tracemalloc import BaseFilter
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
@@ -13,11 +15,23 @@ import ast
 from dbhelper import DBHelper
 from game import Game
 import adminCommands as adminCmd
+import excel2json
+import pandas
 
 PORT = get_port()
 API_KEY = get_api_key()
 if API_KEY == None:
     raise Exception("Please update API Key")
+
+# Excel to Database
+mainDb = DBHelper()
+excelFilePath = "./excel/shanRoyale2022Data.xlsx"
+playerDataRound1JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="playerDataRound1").to_json(orient='records'))
+playerDataRound2JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="playerDataRound2").to_json(orient='records'))
+factionDataJSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="factionData").to_json(orient='records'))
+mainDb.processPlayerDataJSONArr(playerDataRound1JSONArr, 1)
+mainDb.processPlayerDataJSONArr(playerDataRound2JSONArr, 2)
+mainDb.processFactionDataJSONArr(factionDataJSONArr)
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -33,14 +47,14 @@ minPoints = 5
 maxTeamPoints = 200
 roundList = [1, 2]
 
-currentGame = Game(1)
+currentGame = Game(0)
 
 admins = ["praveeeenk"]
 gameMasters = ["praveeeenk"]
 safetyOfficers = ["praveeeenk"]
 
 #=============================Texts==========================================
-dontWasteMyTimeText = """<b>Don't waste my time...</b>\n
+dontWasteMyTimeText = """<b>Don't waste my time...</b> You aren't allowed to use this command now.\n
 ~ Message by Caserplz"""
 
 #============================Tracking State===================================
@@ -100,14 +114,14 @@ def handleAdminBeginRound(update, context, round_no):
                      message_id = update.callback_query.message.message_id,
                      parse_mode = 'HTML')
 
-    for user in userTracker.values():
+    for username, user in userTracker.items():
         # TODO Add in pic of play area
-        # TODO Input target faction
+        targetFaction = getTargetFaction(username)
         text = f"""<b>NOTICE</b>
 Round {round_no} has begun!!\n
 Details of game:
 - Duration: 45 mins
-- Your target Faction is <b>NEED TO CHANGE THIS</b>
+- Your target Faction is <b>{targetFaction}</b>
 - Picture of play area is attached!
 
 Stay safe while playing! Don't run on stairs + high areas and not into people. Remember that this is <b>just a game</b>\n
@@ -116,8 +130,19 @@ Enjoy!"""
                      text = text,
                      parse_mode = 'HTML')
 
+#======================Getters=================================
+def getTargetFaction(username):
+    userDb = userTracker[username]["db"]
+    return userDb.getTargetFaction(username, currentGame.currentRound)
+
 #===========================Set points==============================
 def promptSetPoints(update, context):
+    if (not currentGame.play) or currentGame.killEnabled:
+        bot.send_message(chat_id = update.message.chat.id,
+            text = dontWasteMyTimeText,
+            parse_mode = 'HTML')
+        return
+
     username = update.message.chat.username
     setState(username, StateEnum.setPoints)
 
@@ -138,7 +163,7 @@ def handleSetPoints(chat_id, username, text):
         return
 
     db = userTracker[username]["db"]
-    db.updateRoundPoints(username, points)
+    db.updateRoundPoints(username, points, currentGame.currentRound)
 
     fullText = f"""Allocated {points} points to you for <b>Round {currentGame.currentRound}</b>\n\n
 Click <b>/setpoints</b> again to <b>reset</b> points for this round!
@@ -165,6 +190,18 @@ Please enter your points for this round again"""
 # Sends start command and registers new usernames
 def start(update, context):
     username = update.message.chat.username
+
+    # Create database (this is required to ensure multiple ppl dont use the same db object)
+    db = DBHelper("shan-royale.sqlite")
+    userExists = db.checkUsernameInDB(username)
+    if not userExists:
+        errorText = """Your username is <b>NOT in the database</b>. If you have changed your username after registering for TSE, please change your username back and try /start again.\n\n
+Please contact @praveeeenk if the problem persists."""
+        bot.send_message(chat_id = update.message.chat.id,
+                     text = errorText,
+                     parse_mode = 'HTML')
+        return
+    
     txt1 = "Hi! Welcome to the Shan Royale Bot\n"
     txt2 = "Type <b>/help</b> for more info\n\n"
     txt3 = "Registered username: " + username + "\n\n"
@@ -172,9 +209,6 @@ def start(update, context):
     fullText = txt1 + txt2 + txt3 + txt4
     update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
 
-    # Create database (this is required to ensure multiple ppl dont use the same db object)
-    db = DBHelper("shan-royale.sqlite")
-    userExists = db.handleUsername(username, currentGame.currentRound)
     # Add new user to userTracker
     if username not in userTracker.keys():
         newUserTracker = {
@@ -209,7 +243,7 @@ def mainMessageHandler(update, context):
             handleSetPoints(chat_id, username, text)
             return
         case _:
-            print(f'ERROR IN MSGHANDLER: No such state defined ({currentState})')
+            print(f'ERROR IN MSGHANDLER: No such state defined ({currentState})\nText: {text}')
             return
 
 def mainCallBackHandler(update, context):
@@ -222,7 +256,7 @@ def mainCallBackHandler(update, context):
         handleAdminBeginRound(update, context, value)
         return
     else:
-        print(f'ERROR IN CALLBACKHANDLER: No such optionID defined ({optionID})')
+        print(f'ERROR IN CALLBACKHANDLER: No such optionID defined ({optionID})\nValue: {value}')
         return
 
 #=========================Authentication helpers=======================
