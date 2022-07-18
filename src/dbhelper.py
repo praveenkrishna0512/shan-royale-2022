@@ -1,41 +1,69 @@
 from operator import ne
 import sqlite3
-dayList = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-noSessionString = "No Session"
-thisWeekString = "This Week"
-nextWeekString = "Next Week"
 
 class DBHelper:
     
     def __init__(self, dbname="shan-royale.sqlite"):
+        # TODO CHANGE TO 0 and make set_round function
+        self.curr_round = 1
+        # TODO CHANGE TO "" and update it in set_round function
+        self.currentPlayerTable = "playerRound1Data"
         self.dbname = dbname
         self.conn = sqlite3.connect(dbname)
         self.setup()
 
     
     def setup(self):
-        playerDataStmt = """CREATE TABLE IF NOT EXISTS playerData ( 
+        playerRound1DataStmt = """CREATE TABLE IF NOT EXISTS playerRound1Data ( 
             username TEXT PRIMARY KEY,
+            fullname TEXT,
             faction INTEGER DEFAULT 0,
-            pointsRound1 INTEGER DEFAULT 0,
-            pointsRound2 INTEGER DEFAULT 0,
-            pointsRound3 INTEGER DEFAULT 0,
+            dying BOOL DEFAULT 0,
+            points INTEGER DEFAULT 0,
             deathCount INTEGER DEFAULT 0,
-            killCount INTEGER DEFAULT 0
+            killCount INTEGER DEFAULT 0,
+            visitSpyStation BOOL DEFAULT 0,
+            stickExpiry BIGINT DEFAULT 0,
+            immunityExpiry BIGINT DEFAULT 0,
+            safetyBreaches INTEGER DEFAULT 0
+        )"""
+        playerRound2DataStmt = """CREATE TABLE IF NOT EXISTS playerRound2Data ( 
+            username TEXT PRIMARY KEY,
+            fullname TEXT,
+            faction INTEGER DEFAULT 0,
+            dying BOOL DEFAULT 0,
+            points INTEGER DEFAULT 0,
+            deathCount INTEGER DEFAULT 0,
+            killCount INTEGER DEFAULT 0,
+            visitSpyStation BOOL DEFAULT 0,
+            stickExpiry TIMESTAMP,
+            immunityExpiry TIMESTAMP,
+            safetyBreaches INTEGER DEFAULT 0
         )"""
         factionDataStmt = """CREATE TABLE IF NOT EXISTS factionData ( 
             faction INTEGER DEFAULT 0 PRIMARY KEY,
             bank INTEGER DEFAULT 0,
-            enemyFaction INTEGER DEFAULT 0,
+            enemyFactionRound1 INTEGER DEFAULT 0,
+            enemyFactionRound2 INTEGER DEFAULT 0,
             pointsAssigned INTEGER DEFAULT 0
         )"""
-        self.conn.execute(playerDataStmt)
+        gameDataStmt = """CREATE TABLE IF NOT EXISTS gameData ( 
+            id INTEGER DEFAULT 0 PRIMARY KEY,
+            currentRound INTEGER DEFAULT 0,
+            play BOOL DEFAULT 0,
+            killEnabled BOOL DEFAULT 0,
+            stickRound1 INTEGER DEFAULT 0,
+            stickRound2 INTEGER DEFAULT 0
+        )"""
+        self.conn.execute(playerRound1DataStmt)
+        self.conn.execute(playerRound2DataStmt)
         self.conn.execute(factionDataStmt)
+        self.conn.execute(gameDataStmt)
         self.conn.commit()
 
     # Username Queries (Returns True if user exists)
     def handleUsername(self, username):
-        stmt = """SELECT * FROM playerData WHERE username = (?)"""
+        stmt = f"""SELECT * FROM {self.currentPlayerTable} WHERE username = (?)"""
         args = (username, )
         queryReturn = [x[0] for x in self.conn.execute(stmt, args)]
         if len(queryReturn) == 0:
@@ -45,67 +73,29 @@ class DBHelper:
         return True
 
     def __addUsername(self, username):
-        stmt = "INSERT INTO playerData (username) VALUES (?)"
+        stmt = f"INSERT INTO {self.currentPlayerTable} (username) VALUES (?)"
         args = (username, )
         self.conn.execute(stmt, args)
         self.conn.commit()
 
     def getAllUsernames(self):
-        stmt = """SELECT username FROM playerData"""
+        stmt = f"""SELECT username FROM {self.currentPlayerTable}"""
         return [x[0] for x in self.conn.execute(stmt)]
 
     # Points queries
-    def updateRound1Points(self, username, points):
-        stmt = """UPDATE playerData SET pointsRound1 = (?) WHERE username = (?)"""
+    def updateRoundPoints(self, username, points, round_no):
+        if round_no !=1 and round_no !=2:
+            print(f"wrong num of rounds indiciated: {round_no}")
+            return
+        stmt = f"""UPDATE {self.currentPlayerTable} SET pointsRound{round_no} = (?) WHERE username = (?)"""
         args = (points, username, )
         self.conn.execute(stmt, args)
         self.conn.commit()
 
-    # Session queries
-
-    def setSession(self, username, state):
-        # STATES (encoding - value passed in)
-        # 0 - not amending, 1 - this week, 2 - next week
-        inSession = self.determineSession(state)
-        stmt2 = """UPDATE playerData SET inSession = (?) WHERE username = (?)"""
-        args2 = (inSession, username, )
-        self.conn.execute(stmt2, args2)
-        self.conn.commit()
-
-    def determineSession(self, state):
-        if state == noSessionString:
-            return 0
-        if state == thisWeekString:
-            return 1
-        if state == nextWeekString:
-            return 2
-        else:
-            print("ERROR in determineSession: Bad Week State Input")
-
-    def getSession(self, username):
-        currSession = self.getSessionHelper(username)
-        if currSession != thisWeekString and currSession != nextWeekString:
-            print("ERROR in getSession: Wrong Session Input!")
-            return
-        return currSession
-
-    def getSessionHelper(self, username):
-        stmt = """SELECT inSession FROM playerData WHERE username = (?)"""
-        args = (username, )
-        state = -1
-        for x in self.conn.execute(stmt, args):
-            state = x[0]
-        if state == 0:
-            return noSessionString
-        if state == 1:
-            return thisWeekString
-        if state == 2:
-            return nextWeekString
-
     # Get One User Data
 
     def getPlayerData(self, username):
-        stmt = "SELECT * FROM playerData WHERE username = (?)"
+        stmt = f"SELECT * FROM {self.currentPlayerTable} WHERE username = (?)"
         args = (username,)
         data = []
         for x in self.conn.execute(stmt, args):
@@ -116,6 +106,8 @@ class DBHelper:
     # Purge data queries
 
     def purgeplayerData(self):
-        stmt = "DELETE FROM playerData"
-        self.conn.execute(stmt)
+        playerRound1Datastmt = "DELETE FROM playerRound1Data"
+        playerRound2Datastmt = "DELETE FROM playerRound2Data"
+        self.conn.execute(playerRound1Datastmt)
+        self.conn.execute(playerRound2Datastmt)
         self.conn.commit()

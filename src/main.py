@@ -135,11 +135,28 @@ def handleSetPoints1(chat_id, username, text):
         return
 
     db = userTracker[username]["db"]
-    db.updateRound1Points(username, points)
+    db.updateRoundPoints(username, points, round_no=1)
 
     fullText = f"""Allocated {points} points to you for <b>Round 1</b>\n
 Click <b>/setpoints1</b> again to <b>reset</b> points for Round 1!\n
 Click <b>/setpoints2</b> to set points for Round 2!
+"""
+    bot.send_message(chat_id = chat_id,
+        text = fullText,
+        parse_mode = 'HTML')
+    return
+
+def handleSetPoints2(chat_id, username, text):
+    points = int(text)
+    invalid = invalidPoints(chat_id, points, round_no=2)
+    if invalid: 
+        return
+
+    db = userTracker[username]["db"]
+    db.updateRoundPoints(username, points, round_no=2)
+
+    fullText = f"""Allocated {points} points to you for <b>Round 2</b>\n
+Click <b>/setpoints2</b> again to <b>reset</b> points for Round 2!
 """
     bot.send_message(chat_id = chat_id,
         text = fullText,
@@ -154,6 +171,9 @@ def mainMessageHandler(update, context):
     match currentState:
         case StateEnum.setPoints1:
             handleSetPoints1(chat_id, username, text)
+            return
+        case StateEnum.setPoints2:
+            handleSetPoints2(chat_id, username, text)
             return
         case _:
             print(f'ERROR IN MSGHANDLER: No such state defined ({currentState})')
