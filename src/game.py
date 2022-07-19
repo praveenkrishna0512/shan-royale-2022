@@ -7,9 +7,9 @@ class Game:
         self.stickRound2 = stickRound2
     
     def toString(self):
-        print(f"""Game Info:
+        return f"""Game Info:
 Current Round: {self.currentRound}
 Play: {self.play}
 killEnabled: {self.killEnabled}
 stickRound1: {self.stickRound1}
-stickRound2: {self.stickRound2}""")
+stickRound2: {self.stickRound2}"""

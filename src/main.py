@@ -26,7 +26,7 @@ if API_KEY == None:
 
 # Excel to Database
 mainDb = DBHelper()
-excelFilePath = "./excel/shanRoyale2022Data.xlsx"
+excelFilePath = "./excel/shanRoyale2022Data1.xlsx"
 playerDataRound1JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="playerDataRound1").to_json(orient='records'))
 playerDataRound2JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="playerDataRound2").to_json(orient='records'))
 factionDataJSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="factionData").to_json(orient='records'))
@@ -46,7 +46,15 @@ bot = telebot.TeleBot(API_KEY, parse_mode = None)
 #============================Constants======================================
 minPoints = 5
 maxTeamPoints = 200
+factionsMap = {
+    "1": "Sparta",
+    "2": "Hades",
+    "3": "Aphrodite",
+    "4": "Nemesis"
+}
+
 roundList = [1, 2]
+yesNoList = ["Yes", "No"]
 
 currentGame = Game(0)
 
@@ -55,7 +63,7 @@ gameMasters = ["praveeeenk"]
 safetyOfficers = ["praveeeenk"]
 
 #=============================Texts==========================================
-dontWasteMyTimeText = """<b>Don't waste my time...</b> You aren't allowed to use this command now.\n
+dontWasteMyTimeText = """\"<b>Don't waste my time...</b> You aren't allowed to use this command now.\"
 ~ Message by Caserplz"""
 
 #============================Tracking State===================================
@@ -65,6 +73,7 @@ class StateEnum(enum.Enum):
 
 class OptionIDEnum(enum.Enum):
     beginRound = "beginRound"
+    endSetPoints = "endSetPoints"
 
 # Handles state of the bot for each user
 # Key: username
@@ -90,7 +99,7 @@ def makeInlineKeyboard(lst, optionID):
 # ====================== Admin Commands ===============================
 def adminBeginRound(update, context):
     username = update.message.chat.username
-    isAdmin = checkAdmin(username)
+    isAdmin = checkAdmin(update, context, username)
     if not isAdmin:
         bot.send_message(chat_id = update.message.chat.id,
                      text = dontWasteMyTimeText,
@@ -107,21 +116,90 @@ Which round to you want to begin?"""
 def handleAdminBeginRound(update, context, round_no):
     global currentGame
     currentGame = adminCmd.adminBeginGame(round_no)
-    print(currentGame.toString())
 
-    adminText = f"""Thanks sir! Round {round_no} has begun!!"""
+    adminText = f"""Thanks sir! Set Points phase for Round {round_no} has begun!!
+
+Make sure to type /adminEndSetPoints to begin the Killing Phase."""
     bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
                      text = adminText,
                      message_id = update.callback_query.message.message_id,
                      parse_mode = 'HTML')
 
+    blastText = f"""<b>NOTICE</b>
+Round {round_no} is about to begin!!
+
+You are now in the <b>Set Points</b> phase
+
+<b>Details of phase:</b>
+- Duration: <b>about 10 mins</b>
+- Make sure to /setpoints <b>individually</b> and assign yourselves some points!
+- Do not exceed your team cumulative points of <b>200</b>
+- Everyone must be assigned at least <b>5 points</b>
+- Killing is now <b>disabled</b>. You will be notified when the Killing phase begins
+
+Enjoy!"""
+    blastMessageToAll(blastText)
+
+def adminEndSetPoints(update, context):
+    username = update.message.chat.username
+    isAdmin = checkAdmin(update, context, username)
+    if not isAdmin:
+        return
+
+    setPointsPhase = checkSetPointsPhase(update, context)
+    if not setPointsPhase:
+        return
+
+    adminDb = userTracker[username]["db"]
+    factionPointsMap = getAllFactionPoints(adminDb)
+    pointsText = ""
+    for faction, points in factionPointsMap.items():
+        pointsText += f"""Faction {faction} ({factionsMap[faction]}) - {points}pts\n"""
+
+    fullText = f"""You are about to <b>end Set Points</b> for Round {currentGame.currentRound}.
+Here are the points assigned for each faction.
+
+{pointsText}
+Are you okay with this?"""
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     reply_markup = makeInlineKeyboard(yesNoList, OptionIDEnum.endSetPoints),
+                     parse_mode = 'HTML')
+
+#TODO HERE NOW
+def handleAdminEndSetPoints(update, context, yesNo):
+    global currentGame
+    chat_id = update.callback_query.message.chat.id
+    message_id = update.callback_query.message.message_id
+    if yesNo == yesNoList[1]:
+        # "No" was pressed
+        adminText = f"""No worries, Set Points phase has not ended. Please ask the respective OGL to make amends.\n
+Once that is done, please type /adminEndSetPoints again.\n\n{dontWasteMyTimeText}"""
+        bot.edit_message_text(chat_id = chat_id,
+                     text = adminText,
+                     message_id = message_id,
+                     parse_mode = 'HTML')
+        return
+
+    # "Yes" was pressed
+    currentGame = adminCmd.adminEndSetPoints(currentGame)
+    print(f"Admin End Set Points Game State:\n{currentGame.toString()}")
+    adminText = f"""You have ended Set Points phase for Round {currentGame.currentRound}! Killing has now been enabled :)"""
+    bot.edit_message_text(chat_id = chat_id,
+                    text = adminText,
+                    message_id = message_id,
+                    parse_mode = 'HTML')
+
     for username, user in userTracker.items():
         # TODO Add in pic of play area
         targetFaction = getTargetFaction(username)
         text = f"""<b>NOTICE</b>
-Round {round_no} has begun!!\n
-Details of game:
-- Duration: 45 mins
+Round {currentGame.currentRound} has begun!!
+
+You are now in the <b>Killing</b> phase
+
+<b>Details of phase:</b>
+- Duration: <b>45 mins</b>
 - Your target Faction is <b>{targetFaction}</b>
 - Picture of play area is attached!
 
@@ -135,6 +213,16 @@ Enjoy!"""
 def getTargetFaction(username):
     userDb = userTracker[username]["db"]
     return userDb.getTargetFaction(username, currentGame.currentRound)
+
+def getAllFactionPoints(adminDb):
+    factionPointsMap = {}
+    for faction in factionsMap.keys():
+        factionPoints = adminDb.getFactionPoints(faction, currentGame.currentRound)
+        factionPointsMap[faction] = factionPoints
+    return factionPointsMap
+
+def getAllUsernames(db):
+    return db.getAllUsernames(currentGame.currentRound)
 
 #===========================Set points==============================
 def promptSetPoints(update, context):
@@ -181,12 +269,16 @@ Click <b>/setpoints</b> again to <b>reset</b> points for this round!
     setState(username, None)
 
 def handleListPoints(update, context):
+    playPhase = checkPlayPhase(update, context)
+    if not playPhase:
+        return
+
     username = update.message.chat.username
     userDb = userTracker[username]["db"]
     playerFaction = userDb.getPlayerFaction(username, currentGame.currentRound)
     factionMembersPointsMap = userDb.getFactionMemberPoints(playerFaction, currentGame.currentRound)
 
-    txt1 = "Here are the points for your faction members\n"
+    txt1 = "Here are the current updated points held by your faction members\n"
     txt2 = ""
     for username, points in factionMembersPointsMap.items():
         txt2 += f"\n@{username}: {points}pts"
@@ -249,7 +341,8 @@ def help(update, context):
 <b>/listpoints</b> - List your faction members' points for current round in Shan Royale
 \n"""
     txt3 = "Here are the support admin commands:\n"
-    txt4 = "<b>/adminBeginRound</b> - Begin the round!"
+    txt4 = """<b>/adminBeginRound</b> - Begin the Set Points phase for a round!
+<b>/adminEndSetPoints</b> - End the Set Points phase and begin Killing phase for the current round!"""
     fullText = txt1 + txt2 + txt3 + txt4
     update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
 
@@ -264,7 +357,7 @@ def mainMessageHandler(update, context):
     currentState = userTracker[username]["state"]
     match currentState:
         case StateEnum.setPoints:
-            handleSetPoints(update, context)
+            handleSetPoints(update, context, text)
             return
         case _:
             print(f'ERROR IN MSGHANDLER: No such state defined ({currentState})\nText: {text}')
@@ -274,10 +367,12 @@ def mainCallBackHandler(update, context):
     dataClicked = ast.literal_eval(update.callback_query.data)
     optionID = dataClicked[1]
     value = dataClicked[3]
-    username = update.callback_query.message.chat.username
 
     if optionID == str(OptionIDEnum.beginRound):
         handleAdminBeginRound(update, context, value)
+        return
+    if optionID == str(OptionIDEnum.endSetPoints):
+        handleAdminEndSetPoints(update, context, value)
         return
     else:
         print(f'ERROR IN CALLBACKHANDLER: No such optionID defined ({optionID})\nValue: {value}')
@@ -286,34 +381,60 @@ def mainCallBackHandler(update, context):
 #=========================Game Phase Checkers=========================
 def checkSetPointsPhase(update, context):
     if (not currentGame.play) or currentGame.killEnabled:
+        fullText = f"Set points phase has not started yet!\n\n{dontWasteMyTimeText}"
         bot.send_message(chat_id = update.message.chat.id,
-            text = dontWasteMyTimeText,
+            text = fullText,
             parse_mode = 'HTML')
         return False
     return True
 
 def checkKillingPhase(update, context):
     if (not currentGame.play) or (not currentGame.killEnabled):
+        fullText = f"Killing phase has not started yet!\n\n{dontWasteMyTimeText}"
         bot.send_message(chat_id = update.message.chat.id,
-            text = dontWasteMyTimeText,
+            text = fullText,
+            parse_mode = 'HTML')
+        return False
+    return True
+
+def checkPlayPhase(update, context):
+    if not currentGame.play:
+        fullText = f"Round has not started yet!\n\n{dontWasteMyTimeText}"
+        bot.send_message(chat_id = update.message.chat.id,
+            text = fullText,
             parse_mode = 'HTML')
         return False
     return True
 
 #=========================Authentication helpers=======================
-def checkAdmin(username):
+def checkAdmin(update, context, username):
     if username in admins:
         return True
+    
+    fullText = f"You are not admin!\n\n{dontWasteMyTimeText}"
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     parse_mode = 'HTML')
     return False
 
-def checkGameMaster(username):
+def checkGameMaster(update, context, username):
     if username in gameMasters:
         return True
+
+    fullText = f"You are not GameMaster!\n\n{dontWasteMyTimeText}"
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     parse_mode = 'HTML')
     return False
 
-def checkSafety(username):
+def checkSafety(update, context, username):
     if username in safetyOfficers:
         return True
+
+    fullText = f"You are not Safety!\n\n{dontWasteMyTimeText}"
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     parse_mode = 'HTML')
     return False
 
 #====================Other helpers=========================
@@ -337,6 +458,7 @@ def main():
 
     # Admin commands
     dp.add_handler(CommandHandler("adminBeginRound", adminBeginRound))
+    dp.add_handler(CommandHandler("adminEndSetPoints", adminEndSetPoints))
 
     # Player commands
     dp.add_handler(CommandHandler("start", start))

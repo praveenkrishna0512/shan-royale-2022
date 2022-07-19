@@ -107,24 +107,6 @@ class DBHelper:
             print("USERNAME NOT IN DATABASE: " + username)
             return False
         return True
-        
-
-    # TODO Remove this, as this should be initialized from excel sheet
-    def handleUsername(self, username, round_num):
-        stmt = f"""SELECT * FROM {self.playerTable}{round_num} WHERE username = (?)"""
-        args = (username, )
-        queryReturn = [x[0] for x in self.conn.execute(stmt, args)]
-        if len(queryReturn) == 0:
-            print("Adding new username: " + username)
-            self.__addUsername(username, round_num)
-            return False
-        return True
-
-    def __addUsername(self, username, round_num):
-        stmt = f"INSERT INTO {self.playerTable}{round_num} (username) VALUES (?)"
-        args = (username, )
-        self.conn.execute(stmt, args)
-        self.conn.commit()
 
     def getAllUsernames(self, round_num):
         stmt = f"""SELECT username FROM {self.playerTable}{round_num}"""
@@ -160,6 +142,13 @@ class DBHelper:
             points = self.getRoundPoints(username, round_num)
             factionMemberPointsMap[username] = points
         return factionMemberPointsMap
+
+    def getFactionPoints(self, faction, round_num):
+        factionMemberPointsMap = self.getFactionMemberPoints(faction, round_num)
+        factionPoints = 0
+        for points in factionMemberPointsMap.values():
+            factionPoints += points
+        return factionPoints
     
     def getRoundPoints(self, username, round_num):
         if int(round_num) !=1 and int(round_num) != 2:
