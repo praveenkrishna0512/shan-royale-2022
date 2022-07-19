@@ -52,6 +52,7 @@ factionsMap = {
     "3": "Aphrodite",
     "4": "Nemesis"
 }
+highestAllowedSafetyBreach = 2
 
 roundList = [1, 2]
 yesNoList = ["Yes", "No"]
@@ -209,25 +210,63 @@ Enjoy!"""
                      text = text,
                      parse_mode = 'HTML')
 
-#======================Getters=================================
-def getTargetFaction(username):
-    userDb = userTracker[username]["db"]
-    return userDb.getTargetFaction(username, currentGame.currentRound)
+#========================Player Command Handlers===============================================
+# Sends start command and registers new usernames
+def start(update, context):
+    username = update.message.chat.username
 
-def getAllFactionPoints(adminDb):
-    factionPointsMap = {}
-    for faction in factionsMap.keys():
-        factionPoints = adminDb.getFactionPoints(faction, currentGame.currentRound)
-        factionPointsMap[faction] = factionPoints
-    return factionPointsMap
+    # Create database (this is required to ensure multiple ppl dont use the same db object)
+    db = DBHelper("shan-royale.sqlite")
+    userExists = db.checkUsernameInDB(username)
+    if not userExists:
+        errorText = """Your username is <b>NOT in the database</b>. If you have changed your username after registering for TSE, please change your username back and try /start again.\n\n
+Please contact @praveeeenk if the problem persists."""
+        bot.send_message(chat_id = update.message.chat.id,
+                     text = errorText,
+                     parse_mode = 'HTML')
+        return
+    
+    txt1 = "Hi! Welcome to the Shan Royale Bot\n"
+    txt2 = "Type <b>/help</b> for more info\n\n"
+    txt3 = "Registered username: " + username + "\n\n"
+    txt4 = "IMPT: Please <b>do NOT change your username</b> after starting the bot"
+    fullText = txt1 + txt2 + txt3 + txt4
+    update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
 
-def getAllUsernames(db):
-    return db.getAllUsernames(currentGame.currentRound)
+    # Add new user to userTracker
+    if username not in userTracker.keys():
+        newUserTracker = {
+            "state": None,
+            "db": db,
+            "chat_id": update.message.chat.id
+        }
+        userTracker[username] = newUserTracker
+    print("User Tracker: " + str(userTracker))
+
+def help(update, context):
+    """Send a message when the command /help is issued."""
+    txt1 = "Here are the suppported individual commands:\n"
+    txt2 = """<b>/setpoints</b> - Set/Reset your points for current round in Shan Royale
+<b>/listpoints</b> - List your faction members' points for current round in Shan Royale
+\n"""
+    txt3 = "Here are the support admin commands:\n"
+    txt4 = """<b>/adminBeginRound</b> - Begin the Set Points phase for a round!
+<b>/adminEndSetPoints</b> - End the Set Points phase and begin Killing phase for the current round!"""
+    fullText = txt1 + txt2 + txt3 + txt4
+    update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
+
+def error(update, context):
+    """Log Errors caused by Updates."""
+    logger.warning('Update "%s" caused error "%s"', update, context.error)
 
 #===========================Set points==============================
 def promptSetPoints(update, context):
     setPointsPhase = checkSetPointsPhase(update, context)
     if not setPointsPhase:
+        return
+
+    safe = checkSafetyBreaches(update, context)
+    if not safe:
         return
 
     username = update.message.chat.username
@@ -301,54 +340,6 @@ Please enter your points for this round again"""
         parse_mode = 'HTML')
     return True
 
-#========================Command Handlers==================================
-# Sends start command and registers new usernames
-def start(update, context):
-    username = update.message.chat.username
-
-    # Create database (this is required to ensure multiple ppl dont use the same db object)
-    db = DBHelper("shan-royale.sqlite")
-    userExists = db.checkUsernameInDB(username)
-    if not userExists:
-        errorText = """Your username is <b>NOT in the database</b>. If you have changed your username after registering for TSE, please change your username back and try /start again.\n\n
-Please contact @praveeeenk if the problem persists."""
-        bot.send_message(chat_id = update.message.chat.id,
-                     text = errorText,
-                     parse_mode = 'HTML')
-        return
-    
-    txt1 = "Hi! Welcome to the Shan Royale Bot\n"
-    txt2 = "Type <b>/help</b> for more info\n\n"
-    txt3 = "Registered username: " + username + "\n\n"
-    txt4 = "IMPT: Please <b>do NOT change your username</b> after starting the bot"
-    fullText = txt1 + txt2 + txt3 + txt4
-    update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
-
-    # Add new user to userTracker
-    if username not in userTracker.keys():
-        newUserTracker = {
-            "state": None,
-            "db": db,
-            "chat_id": update.message.chat.id
-        }
-        userTracker[username] = newUserTracker
-    print("User Tracker: " + str(userTracker))
-
-def help(update, context):
-    """Send a message when the command /help is issued."""
-    txt1 = "Here are the suppported individual commands:\n"
-    txt2 = """<b>/setpoints</b> - Set/Reset your points for current round in Shan Royale
-<b>/listpoints</b> - List your faction members' points for current round in Shan Royale
-\n"""
-    txt3 = "Here are the support admin commands:\n"
-    txt4 = """<b>/adminBeginRound</b> - Begin the Set Points phase for a round!
-<b>/adminEndSetPoints</b> - End the Set Points phase and begin Killing phase for the current round!"""
-    fullText = txt1 + txt2 + txt3 + txt4
-    update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
-
-def error(update, context):
-    """Log Errors caused by Updates."""
-    logger.warning('Update "%s" caused error "%s"', update, context.error)
 
 #===================Message and Callback Handlers==============================
 def mainMessageHandler(update, context):
@@ -436,6 +427,41 @@ def checkSafety(update, context, username):
                      text = fullText,
                      parse_mode = 'HTML')
     return False
+
+def checkSafetyBreaches(update, context):
+    username = update.message.chat.username
+    cumulativePlayerSafetyBreaches = getPlayerSafetyBreaches(username)
+    if cumulativePlayerSafetyBreaches < highestAllowedSafetyBreach:
+        return True
+    
+    fullText = f"You have a total of {cumulativePlayerSafetyBreaches} Safety Breaches! You may not play the game.\n\n{dontWasteMyTimeText}"
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     parse_mode = 'HTML')
+    return False
+
+#======================Getters=================================
+def getTargetFaction(username):
+    userDb = userTracker[username]["db"]
+    return userDb.getTargetFaction(username, currentGame.currentRound)
+
+def getAllFactionPoints(adminDb):
+    factionPointsMap = {}
+    for faction in factionsMap.keys():
+        factionPoints = adminDb.getFactionPoints(faction, currentGame.currentRound)
+        factionPointsMap[faction] = factionPoints
+    return factionPointsMap
+
+def getAllUsernames(db):
+    return db.getAllUsernames(currentGame.currentRound)
+
+def getPlayerSafetyBreaches(username):
+    userDb = userTracker[username]["db"]
+    cumulativeSafetyBreach = 0
+    for round_num in roundList:
+        roundSafetyBreach = userDb.getPlayerSafetyBreaches(username, round_num)
+        cumulativeSafetyBreach += roundSafetyBreach
+    return cumulativeSafetyBreach
 
 #====================Other helpers=========================
 

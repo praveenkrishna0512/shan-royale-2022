@@ -168,6 +168,14 @@ class DBHelper:
         self.conn.execute(stmt, args)
         self.conn.commit()
 
+    # Safety Queries
+    def getPlayerSafetyBreaches(self, username, round_num):
+        stmt = f"SELECT safetyBreaches FROM {self.playerTable}{round_num} WHERE username = (?)"
+        args = (username,)
+        data = []
+        for x in self.conn.execute(stmt, args):
+            return x[0]
+
     # Get One User Data
 
     def getPlayerData(self, username, round_num):
