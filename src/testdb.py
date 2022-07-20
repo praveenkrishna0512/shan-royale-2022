@@ -4,7 +4,7 @@ from dbhelper import DBHelper
 db = DBHelper("shan-royale.sqlite")
 
 def main():
-    print(db.getFactionPoints(1, 2))
+    print(db.getRoundKillCount("praveeeenk", 2))
     return
 
 if __name__ == '__main__':

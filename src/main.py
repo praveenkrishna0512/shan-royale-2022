@@ -75,6 +75,7 @@ class StateEnum(enum.Enum):
 class OptionIDEnum(enum.Enum):
     beginRound = "beginRound"
     endSetPoints = "endSetPoints"
+    endRound = "endRound"
 
 # Handles state of the bot for each user
 # Key: username
@@ -98,13 +99,10 @@ def makeInlineKeyboard(lst, optionID):
 # TODO: DB to main file converters (maybe put in dbhelper.py)
 
 # ====================== Admin Commands ===============================
-def adminBeginRound(update, context):
+def adminBeginRoundCmd(update, context):
     username = update.message.chat.username
     isAdmin = checkAdmin(update, context, username)
     if not isAdmin:
-        bot.send_message(chat_id = update.message.chat.id,
-                     text = dontWasteMyTimeText,
-                     parse_mode = 'HTML')
         return
 
     text = """You are about to begin a round!\n
@@ -116,9 +114,9 @@ Which round to you want to begin?"""
 
 def handleAdminBeginRound(update, context, round_no):
     global currentGame
-    currentGame = adminCmd.adminBeginGame(round_no)
+    currentGame = adminCmd.beginRound(round_no)
 
-    adminText = f"""Thanks sir! Set Points phase for Round {round_no} has begun!!
+    adminText = f"""Thanks sir! Set Points phase for Round {currentGame.currentRound} has begun!!
 
 Make sure to type /adminEndSetPoints to begin the Killing Phase."""
     bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
@@ -141,7 +139,7 @@ You are now in the <b>Set Points</b> phase
 Enjoy!"""
     blastMessageToAll(blastText)
 
-def adminEndSetPoints(update, context):
+def adminEndSetPointsCmd(update, context):
     username = update.message.chat.username
     isAdmin = checkAdmin(update, context, username)
     if not isAdmin:
@@ -167,7 +165,6 @@ Are you okay with this?"""
                      reply_markup = makeInlineKeyboard(yesNoList, OptionIDEnum.endSetPoints),
                      parse_mode = 'HTML')
 
-#TODO HERE NOW
 def handleAdminEndSetPoints(update, context, yesNo):
     global currentGame
     chat_id = update.callback_query.message.chat.id
@@ -183,7 +180,7 @@ Once that is done, please type /adminEndSetPoints again.\n\n{dontWasteMyTimeText
         return
 
     # "Yes" was pressed
-    currentGame = adminCmd.adminEndSetPoints(currentGame)
+    currentGame = adminCmd.endSetPoints(currentGame)
     print(f"Admin End Set Points Game State:\n{currentGame.toString()}")
     adminText = f"""You have ended Set Points phase for Round {currentGame.currentRound}! Killing has now been enabled :)"""
     bot.edit_message_text(chat_id = chat_id,
@@ -210,9 +207,59 @@ Enjoy!"""
                      text = text,
                      parse_mode = 'HTML')
 
+def adminEndRoundCmd(update, context):
+    username = update.message.chat.username
+    isAdmin = checkAdmin(update, context, username)
+    if not isAdmin:
+        return
+
+    isPlayPhase = checkPlayPhase(update, context)
+    if not isPlayPhase:
+        return
+
+    text = f"""You are about to end Round {currentGame.currentRound}!\n
+Are you sure you want to do this?"""
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = text,
+                     reply_markup = makeInlineKeyboard(yesNoList, OptionIDEnum.endRound),
+                     parse_mode = 'HTML')
+
+def handleAdminEndRound(update, context, yesNo):
+    global currentGame
+    chat_id = update.callback_query.message.chat.id
+    message_id = update.callback_query.message.message_id
+    if yesNo == yesNoList[1]:
+        # "No" was pressed
+        adminText = f"""No worries, Round {currentGame.currentRound} has not ended.\n\n{dontWasteMyTimeText}"""
+        bot.edit_message_text(chat_id = chat_id,
+                     text = adminText,
+                     message_id = message_id,
+                     parse_mode = 'HTML')
+        return
+
+    # "Yes" was pressed
+    currentGame = adminCmd.endRound(currentGame)
+    print(f"Admin End Round Game State:\n{currentGame.toString()}")
+    adminText = f"""You have ended Round {currentGame.currentRound}!
+Please type /adminBeginRound to start another round."""
+    bot.edit_message_text(chat_id = chat_id,
+                    text = adminText,
+                    message_id = message_id,
+                    parse_mode = 'HTML')
+
+    blastText = f"""<b>NOTICE</b>
+Round {currentGame.currentRound} has ended!!
+
+You may strategize your points distribution for the next round (if there is)
+
+If not, wait for the admin to begin another round!
+
+If there are no more round, hope you enjoyed the game and please gather at your next location!"""
+    blastMessageToAll(blastText)
+
 #========================Player Command Handlers===============================================
 # Sends start command and registers new usernames
-def start(update, context):
+def startCmd(update, context):
     username = update.message.chat.username
 
     # Create database (this is required to ensure multiple ppl dont use the same db object)
@@ -243,7 +290,7 @@ Please contact @praveeeenk if the problem persists."""
         userTracker[username] = newUserTracker
     print("User Tracker: " + str(userTracker))
 
-def help(update, context):
+def helpCmd(update, context):
     """Send a message when the command /help is issued."""
     txt1 = "Here are the suppported individual commands:\n"
     txt2 = """<b>/setpoints</b> - Set/Reset your points for current round in Shan Royale
@@ -251,7 +298,8 @@ def help(update, context):
 \n"""
     txt3 = "Here are the support admin commands:\n"
     txt4 = """<b>/adminBeginRound</b> - Begin the Set Points phase for a round!
-<b>/adminEndSetPoints</b> - End the Set Points phase and begin Killing phase for the current round!"""
+<b>/adminEndSetPoints</b> - End the Set Points phase and begin Killing phase for the current round!
+<b>/adminEndRound</b> - End the Round despite the phase"""
     fullText = txt1 + txt2 + txt3 + txt4
     update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
 
@@ -259,8 +307,15 @@ def error(update, context):
     """Log Errors caused by Updates."""
     logger.warning('Update "%s" caused error "%s"', update, context.error)
 
+#===========================General Player Cmds======================
+# TODO: HERE NOW
+def factionCmd(update, context):
+    username = update.message.chat.username
+    playerFaction = getPlayerFaction(username)
+    return
+
 #===========================Set points==============================
-def promptSetPoints(update, context):
+def setPointsCmd(update, context):
     setPointsPhase = checkSetPointsPhase(update, context)
     if not setPointsPhase:
         return
@@ -307,7 +362,7 @@ Click <b>/setpoints</b> again to <b>reset</b> points for this round!
     
     setState(username, None)
 
-def handleListPoints(update, context):
+def listPointsCmd(update, context):
     playPhase = checkPlayPhase(update, context)
     if not playPhase:
         return
@@ -340,7 +395,6 @@ Please enter your points for this round again"""
         parse_mode = 'HTML')
     return True
 
-
 #===================Message and Callback Handlers==============================
 def mainMessageHandler(update, context):
     username = update.message.chat.username
@@ -364,6 +418,9 @@ def mainCallBackHandler(update, context):
         return
     if optionID == str(OptionIDEnum.endSetPoints):
         handleAdminEndSetPoints(update, context, value)
+        return
+    if optionID == str(OptionIDEnum.endRound):
+        handleAdminEndRound(update, context, value)
         return
     else:
         print(f'ERROR IN CALLBACKHANDLER: No such optionID defined ({optionID})\nValue: {value}')
@@ -445,6 +502,10 @@ def getTargetFaction(username):
     userDb = userTracker[username]["db"]
     return userDb.getTargetFaction(username, currentGame.currentRound)
 
+def getPlayerFaction(username):
+    userDb = userTracker[username]["db"]
+    return userDb.getPlayerFaction(username, currentGame.currentRound)
+
 def getAllFactionPoints(adminDb):
     factionPointsMap = {}
     for faction in factionsMap.keys():
@@ -464,7 +525,6 @@ def getPlayerSafetyBreaches(username):
     return cumulativeSafetyBreach
 
 #====================Other helpers=========================
-
 def blastMessageToAll(text):
     for user in userTracker.values():
         bot.send_message(chat_id = user["chat_id"],
@@ -483,14 +543,16 @@ def main():
     dp = updater.dispatcher
 
     # Admin commands
-    dp.add_handler(CommandHandler("adminBeginRound", adminBeginRound))
-    dp.add_handler(CommandHandler("adminEndSetPoints", adminEndSetPoints))
+    dp.add_handler(CommandHandler("adminBeginRound", adminBeginRoundCmd))
+    dp.add_handler(CommandHandler("adminEndSetPoints", adminEndSetPointsCmd))
+    dp.add_handler(CommandHandler("adminEndRound", adminEndRoundCmd))
 
     # Player commands
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("help", help))
-    dp.add_handler(CommandHandler("setpoints", promptSetPoints))
-    dp.add_handler(CommandHandler("listpoints", handleListPoints))
+    dp.add_handler(CommandHandler("start", startCmd))
+    dp.add_handler(CommandHandler("help", helpCmd))
+    dp.add_handler(CommandHandler("faction", factionCmd))
+    dp.add_handler(CommandHandler("setpoints", setPointsCmd))
+    dp.add_handler(CommandHandler("listpoints", listPointsCmd))
 
     # Handle all messages
     dp.add_handler(MessageHandler(callback=mainMessageHandler, filters=Filters.all))

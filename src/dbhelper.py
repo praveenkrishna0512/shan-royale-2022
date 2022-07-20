@@ -168,7 +168,35 @@ class DBHelper:
         self.conn.execute(stmt, args)
         self.conn.commit()
 
-    # Safety Queries
+    #=================================KD Queries==================================================
+    # TODO: HERE NOW
+    def getFactionMemberKD(self, faction, round_num):
+        factionMembers = self.getFactionMemberUsernames(faction, round_num)
+        factionMemberKDMap = {}
+        for username in factionMembers:
+            points = self.getRoundPoints(username, round_num)
+            factionMemberKDMap[username] = points
+        return factionMemberKDMap
+    
+    def getRoundKillCount(self, username, round_num):
+        if int(round_num) !=1 and int(round_num) != 2:
+            print(f"wrong num of rounds indiciated: {round_num}")
+            return
+        stmt = f"""SELECT killCount FROM {self.playerTable}{round_num} WHERE username = (?)"""
+        args = (username, )
+        for x in self.conn.execute(stmt, args):
+            return x[0]
+
+    def getRoundDeathCount(self, username, round_num):
+        if int(round_num) !=1 and int(round_num) != 2:
+            print(f"wrong num of rounds indiciated: {round_num}")
+            return
+        stmt = f"""SELECT deathCount FROM {self.playerTable}{round_num} WHERE username = (?)"""
+        args = (username, )
+        for x in self.conn.execute(stmt, args):
+            return x[0]
+
+    # ===============================Safety Queries=================================================
     def getPlayerSafetyBreaches(self, username, round_num):
         stmt = f"SELECT safetyBreaches FROM {self.playerTable}{round_num} WHERE username = (?)"
         args = (username,)
