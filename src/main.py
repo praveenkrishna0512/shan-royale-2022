@@ -57,7 +57,7 @@ highestAllowedSafetyBreach = 2
 roundList = [1, 2]
 yesNoList = ["Yes", "No"]
 
-currentGame = Game(0)
+currentGame = Game(roundList[0])
 
 admins = ["praveeeenk"]
 gameMasters = ["praveeeenk"]
@@ -132,6 +132,7 @@ You are now in the <b>Set Points</b> phase
 <b>Details of phase:</b>
 - Duration: <b>about 10 mins</b>
 - Make sure to /setpoints <b>individually</b> and assign yourselves some points!
+- Enter /listpoints to see the <b>points of all members</b> in your faction
 - Do not exceed your team cumulative points of <b>200</b>
 - Everyone must be assigned at least <b>5 points</b>
 - Killing is now <b>disabled</b>. You will be notified when the Killing phase begins
@@ -165,6 +166,9 @@ Are you okay with this?"""
                      reply_markup = makeInlineKeyboard(yesNoList, OptionIDEnum.endSetPoints),
                      parse_mode = 'HTML')
 
+# TODO: Check if all points are above 5
+# If it is not, highlight the relevant faction with lesser than 5 points,
+# and their current points assigned
 def handleAdminEndSetPoints(update, context, yesNo):
     global currentGame
     chat_id = update.callback_query.message.chat.id
@@ -308,13 +312,54 @@ def error(update, context):
     logger.warning('Update "%s" caused error "%s"', update, context.error)
 
 #===========================General Player Cmds======================
-# TODO: HERE NOW
+# TODO: SORT POINTS IF POSSIBLE
 def factionCmd(update, context):
+    safe = checkSafetyBreaches(update, context)
+    if not safe:
+        return
+
     username = update.message.chat.username
-    playerFaction = getPlayerFaction(username)
-    return
+    userDb = userTracker[username]["db"]
+    playerFaction = userDb.getPlayerFaction(username, currentGame.currentRound)
+    factionBank = userDb.getBank(playerFaction)
+    factionMembersPointsMap = userDb.getFactionMemberPoints(playerFaction, currentGame.currentRound)
+    factionKDArrMap = userDb.getFactionMemberKD(playerFaction, currentGame.currentRound)
+
+    header = f"<b>Faction {factionsMap[str(playerFaction)]} Stats (id: {playerFaction})</b>"
+    bankTxt = f"\n\n<b>Bank:</b> {factionBank}"
+    pointsTxt = "\n\n<b>Current Points:</b>"
+    killCountTxt = "\n\n<b>Kill Count:</b>"
+    deathCountTxt = "\n\n<b>Death Count:</b>"
+    for username, points in factionMembersPointsMap.items():
+        pointsTxt += f"\n@{username}: {points}pts"
+    for username, KDArr in factionKDArrMap.items():
+        killCountTxt += f"\n@{username}: {KDArr[0]}"
+        deathCountTxt += f"\n@{username}: {KDArr[1]}"
+    fullText = header + bankTxt + pointsTxt + killCountTxt + deathCountTxt
+
+    bot.send_message(chat_id = update.message.chat.id,
+        text = fullText,
+        parse_mode = 'HTML')
+
+#TODO: SORT BANKS IF POSSIBLE
+def listBanksCmd(update, context):
+    safe = checkSafetyBreaches(update, context)
+    if not safe:
+        return
+
+    username = update.message.chat.username
+    userDb = userTracker[username]["db"]
+    bankTxt = "<b>Faction Banks</b>\n"
+    for faction, name in factionsMap.items():
+        factionBank = userDb.getBank(faction)
+        bankTxt += f"\n<b>{name}:</b> {factionBank}pts"
+    
+    bot.send_message(chat_id = update.message.chat.id,
+        text = bankTxt,
+        parse_mode = 'HTML')
 
 #===========================Set points==============================
+#TODO: SHOW CURRENT POINTS ASSIGNED
 def setPointsCmd(update, context):
     setPointsPhase = checkSetPointsPhase(update, context)
     if not setPointsPhase:
@@ -337,6 +382,7 @@ Take Note:<em>
         text = fullText,
         parse_mode = 'HTML')
 
+#TODO: SHOW CURRENT POINTS ASSIGNED
 def handleSetPoints(update, context, text):
     chat_id = update.message.chat.id
     username = update.message.chat.username
@@ -500,11 +546,7 @@ def checkSafetyBreaches(update, context):
 #======================Getters=================================
 def getTargetFaction(username):
     userDb = userTracker[username]["db"]
-    return userDb.getTargetFaction(username, currentGame.currentRound)
-
-def getPlayerFaction(username):
-    userDb = userTracker[username]["db"]
-    return userDb.getPlayerFaction(username, currentGame.currentRound)
+    return userDb.getTargetFaction(username, currentGame.currentRound) 
 
 def getAllFactionPoints(adminDb):
     factionPointsMap = {}
@@ -551,6 +593,7 @@ def main():
     dp.add_handler(CommandHandler("start", startCmd))
     dp.add_handler(CommandHandler("help", helpCmd))
     dp.add_handler(CommandHandler("faction", factionCmd))
+    dp.add_handler(CommandHandler("listBanks", listBanksCmd))
     dp.add_handler(CommandHandler("setpoints", setPointsCmd))
     dp.add_handler(CommandHandler("listpoints", listPointsCmd))
 

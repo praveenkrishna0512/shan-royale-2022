@@ -134,6 +134,12 @@ class DBHelper:
             factionMembers.append(x[0])
         return factionMembers
 
+    def getBank(self, faction):
+        stmt = f"SELECT bank FROM {self.factionTable} WHERE faction = (?)"
+        args = (faction, )
+        for x in self.conn.execute(stmt, args):
+            return x[0]
+
     # =============================Points queries=================================
     def getFactionMemberPoints(self, faction, round_num):
         factionMembers = self.getFactionMemberUsernames(faction, round_num)
@@ -169,13 +175,13 @@ class DBHelper:
         self.conn.commit()
 
     #=================================KD Queries==================================================
-    # TODO: HERE NOW
     def getFactionMemberKD(self, faction, round_num):
         factionMembers = self.getFactionMemberUsernames(faction, round_num)
         factionMemberKDMap = {}
         for username in factionMembers:
-            points = self.getRoundPoints(username, round_num)
-            factionMemberKDMap[username] = points
+            kills = self.getRoundKillCount(username, round_num)
+            deaths = self.getRoundDeathCount(username, round_num)
+            factionMemberKDMap[username] = [kills, deaths]
         return factionMemberKDMap
     
     def getRoundKillCount(self, username, round_num):

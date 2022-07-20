@@ -4,7 +4,7 @@ from dbhelper import DBHelper
 db = DBHelper("shan-royale.sqlite")
 
 def main():
-    print(db.getRoundKillCount("praveeeenk", 2))
+    print(db.getBank(1))
     return
 
 if __name__ == '__main__':
