@@ -206,9 +206,26 @@ class DBHelper:
     def getPlayerSafetyBreaches(self, username, round_num):
         stmt = f"SELECT safetyBreaches FROM {self.playerTable}{round_num} WHERE username = (?)"
         args = (username,)
-        data = []
         for x in self.conn.execute(stmt, args):
             return x[0]
+
+    #==============================Expiry Queries===============================================
+    def getImmunityExpiry(self, username, round_num):
+        stmt = f"SELECT immunityExpiry FROM {self.playerTable}{round_num} WHERE username = (?)"
+        args = (username,)
+        for x in self.conn.execute(stmt, args):
+            return x[0]
+
+    #=============================Dying Queries=============================================
+    def setPlayerDying(self, username, round_num, dying):
+        if dying:
+            dying = 1
+        else:
+            dying = 0
+        stmt = f"""UPDATE {self.playerTable}{round_num} SET dying = (?) WHERE username = (?)"""
+        args = (dying, username, )
+        self.conn.execute(stmt, args)
+        self.conn.commit()
 
     # Get One User Data
 

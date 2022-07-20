@@ -3,8 +3,10 @@ import enum
 import json
 import logging
 from os import kill
+from sqlite3 import Time
 from tabnanny import check
 import this
+import time
 from tracemalloc import BaseFilter
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 from click import option
@@ -25,11 +27,11 @@ if API_KEY == None:
     raise Exception("Please update API Key")
 
 # Excel to Database
-mainDb = DBHelper()
 excelFilePath = "./excel/shanRoyale2022Data1.xlsx"
 playerDataRound1JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="playerDataRound1").to_json(orient='records'))
 playerDataRound2JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="playerDataRound2").to_json(orient='records'))
 factionDataJSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="factionData").to_json(orient='records'))
+mainDb = DBHelper()
 mainDb.processPlayerDataJSONArr(playerDataRound1JSONArr, 1)
 mainDb.processPlayerDataJSONArr(playerDataRound2JSONArr, 2)
 mainDb.processFactionDataJSONArr(factionDataJSONArr)
@@ -76,6 +78,7 @@ class OptionIDEnum(enum.Enum):
     beginRound = "beginRound"
     endSetPoints = "endSetPoints"
     endRound = "endRound"
+    dying = "dying"
 
 # Handles state of the bot for each user
 # Key: username
@@ -391,10 +394,10 @@ def handleSetPoints(update, context, text):
     if not setPointsPhase:
         return
 
-    points = int(text)
-    invalid = invalidPoints(chat_id, points)
+    invalid = invalidPoints(chat_id, text)
     if invalid: 
         return
+    points = int(text)
 
     db = userTracker[username]["db"]
     db.updateRoundPoints(username, points, currentGame.currentRound)
@@ -428,8 +431,17 @@ def listPointsCmd(update, context):
         text = fullText,
         parse_mode = 'HTML')
 
-def invalidPoints(chat_id, points):
-    #TODO ADD CHECKS FOR TEAM POINTS TOO!
+#TODO ADD CHECKS FOR TEAM POINTS TOO!
+def invalidPoints(chat_id, text):
+    try:
+        points = int(text)
+    except:
+        txt = "<b>Wrong Input! Please type in a value from 5 - 200 only!</b>"
+        bot.send_message(chat_id = chat_id,
+            text = txt,
+            parse_mode = 'HTML')
+        return True
+
     if points >= minPoints:
         return False
 
@@ -440,6 +452,64 @@ Please enter your points for this round again"""
         text = fullText,
         parse_mode = 'HTML')
     return True
+
+#=========================Killing Mechanism================================
+def dyingCmd(update, context):
+    killingPhase = checkKillingPhase(update, context)
+    if not killingPhase:
+        return
+    safe = checkSafetyBreaches(update, context)
+    if not safe:
+        return
+    username = update.message.chat.username
+    immune = checkImmunity(update, context, username)
+    if immune:
+        return
+    
+    fullText = f"""/dying should only be entered <b>once you have been "killed" in person by someone else.</b>
+
+Press yes if you wish to proceed."""
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     reply_markup = makeInlineKeyboard(yesNoList, OptionIDEnum.dying),
+                     parse_mode = 'HTML')
+
+def handleDying(update, context, yesNo):
+    chat_id = update.callback_query.message.chat.id
+    message_id = update.callback_query.message.message_id
+    if yesNo == yesNoList[1]:
+        # "No" was pressed
+        bot.edit_message_text(chat_id = chat_id,
+                     text = dontWasteMyTimeText,
+                     message_id = message_id,
+                     parse_mode = 'HTML')
+        return
+    # "Yes" was pressed
+    username = update.callback_query.message.chat.username
+    userDb = userTracker[username]["db"]
+    userDb.setPlayerDying(username, currentGame.currentRound, True)
+
+    fullText = f"""<b>You have registered yourself as dying.</b> The killer must now /kill to confirm the kill.
+
+You will be informed on the changes in points once the kill is validated."""
+    bot.edit_message_text(chat_id = chat_id,
+                    text = fullText,
+                    message_id = message_id,
+                    parse_mode = 'HTML')
+    return
+
+def checkImmunity(update, context, username):
+    userDb = userTracker[username]["db"]
+    currentTime = time.time()
+    playerImmunityExpiry = userDb.getImmunityExpiry(username, currentGame.currentRound)
+    remainingTime = playerImmunityExpiry - currentTime
+    if remainingTime > 0:
+        fullText = f"You are still immune for {remainingTime} seconds!\n\nYou may not be killed"
+        bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     parse_mode = 'HTML')
+        return True
+    return False
 
 #===================Message and Callback Handlers==============================
 def mainMessageHandler(update, context):
@@ -467,6 +537,9 @@ def mainCallBackHandler(update, context):
         return
     if optionID == str(OptionIDEnum.endRound):
         handleAdminEndRound(update, context, value)
+        return
+    if optionID == str(OptionIDEnum.dying):
+        handleDying(update, context, value)
         return
     else:
         print(f'ERROR IN CALLBACKHANDLER: No such optionID defined ({optionID})\nValue: {value}')
@@ -594,8 +667,13 @@ def main():
     dp.add_handler(CommandHandler("help", helpCmd))
     dp.add_handler(CommandHandler("faction", factionCmd))
     dp.add_handler(CommandHandler("listBanks", listBanksCmd))
+
+    # Player commands - set points phase
     dp.add_handler(CommandHandler("setpoints", setPointsCmd))
     dp.add_handler(CommandHandler("listpoints", listPointsCmd))
+
+    # Player commands - killing phase
+    dp.add_handler(CommandHandler("dying", dyingCmd))
 
     # Handle all messages
     dp.add_handler(MessageHandler(callback=mainMessageHandler, filters=Filters.all))
