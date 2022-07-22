@@ -686,15 +686,17 @@ def main():
     dp.add_error_handler(error)
 
     # Start the Bot
-    # updater.start_webhook(listen="0.0.0.0",
-    #                     port=int(PORT),
-    #                     url_path=str(API_KEY))
-    # updater.bot.setWebhook('https://whispering-dawn-13866.herokuapp.com/' + str(API_KEY))
+    updater.start_webhook(listen="0.0.0.0",
+                        port=int(PORT),
+                        url_path=str(API_KEY))
+    updater.bot.setWebhook('https://radiant-inlet-41935.herokuapp.com/' + str(API_KEY))
 
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT. This should be used most of the time, since
     # start_polling() is non-blocking and will stop the bot gracefully.
-    updater.start_polling()
+    # updater.start_polling()
+
+    #TODO: Update Excel sheet every once in a while
 
 if __name__ == '__main__':
     main()
