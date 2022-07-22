@@ -4,10 +4,12 @@ import enum
 import json
 import logging
 from os import kill
+from random import randint, random
 from sqlite3 import Time
 from tabnanny import check
 import time
 from tracemalloc import BaseFilter
+from numpy import full
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 from env import get_api_key, get_port
 from telebot import types, telebot
@@ -80,6 +82,12 @@ class OptionIDEnum(enum.Enum):
     endRound = "endRound"
     dying = "dying"
     visitSpyStation = "visitSpyStation"
+    tier1a = "tier1a"
+    tier1b = "tier1b"
+    tier2a = "tier2a"
+    tier2b = "tier2b"
+    tier3a = "tier3a"
+    tier3b = "tier3b"
 
 # Handles state of the bot for each user
 # Key: username
@@ -516,7 +524,7 @@ def handleDying(update, context, yesNo):
     if not killingPhase:
         setState(username, None)
         return
-    username = update.message.chat.username
+    username = update.callback_query.message.chat.username
     immune = checkImmunity(update, context, username)
     if immune:
         return
@@ -528,7 +536,6 @@ def handleDying(update, context, yesNo):
                      parse_mode = 'HTML')
         return
     # "Yes" was pressed
-    username = update.callback_query.message.chat.username
     userDb = userTracker[username]["db"]
     userDb.setPlayerDying(username, currentGame.currentRound, True)
 
@@ -871,6 +878,36 @@ def visitedSpyStation(update, context, username):
         return True
     return False
 
+#========================Spy Master Commands==================================
+def tier1aCmd(update, context):
+    username = update.message.chat.username
+    gameMaster = checkGameMaster(update, context, username)
+    if not gameMaster:
+        return
+    
+    fullText = f"""Please state the <b>ID of the faction</b> you are querying for.
+
+<b>Faction Legend:</b>"""
+    for id, name in factionsMap.items():
+        fullText += f"\nID {id}: {name}"
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     reply_markup = makeInlineKeyboard(factionsMap.keys(), OptionIDEnum.tier1a),
+                     parse_mode = 'HTML')
+
+#TODO: HERE NOW
+def handleTier1a(update, context, faction):
+    username = update.callback_query.message.chat.username
+    userDb = userTracker[username]["db"]
+    enemyFaction = userDb.getTargetFactionFromFaction(faction, currentGame.currentRound)
+    nonEnemyFactions = []
+    for factionID in factionsMap.keys():
+        if factionID == str(faction) or factionID == str(enemyFaction):
+            continue
+        nonEnemyFactions.append(factionID)
+    random_num = random()
+
+
 #===================Message and Callback Handlers==============================
 def mainMessageHandler(update, context):
     username = update.message.chat.username
@@ -906,6 +943,9 @@ def mainCallBackHandler(update, context):
         return
     if optionID == str(OptionIDEnum.visitSpyStation):
         handleVisitSpyStation(update, context, value)
+        return
+    if optionID == str(OptionIDEnum.tier1a):
+        handleTier1a(update, context, value)
         return
     else:
         print(f'ERROR IN CALLBACKHANDLER: No such optionID defined ({optionID})\nValue: {value}')
@@ -1058,6 +1098,9 @@ def main():
 
     # Player commands - spystation
     dp.add_handler(CommandHandler("visitSpyStation", visitSpyStationCmd))
+
+    # Game Master commands - spystation
+    dp.add_handler(CommandHandler("tier1a", tier1aCmd))
 
     # Handle all messages
     dp.add_handler(MessageHandler(callback=mainMessageHandler, filters=Filters.all))

@@ -223,8 +223,11 @@ class DBHelper:
     # ==============================Faction Queries===========================
     def getTargetFaction(self, username, round_num):
         playerFaction = self.getPlayerFaction(username, round_num)
+        return self.getTargetFactionFromFaction(playerFaction, round_num)
+
+    def getTargetFactionFromFaction(self, faction, round_num):
         stmt = f"SELECT enemyFactionRound{round_num} FROM {self.factionTable} WHERE faction = (?)"
-        args = (playerFaction, )
+        args = (faction, )
         for x in self.conn.execute(stmt, args):
             return x[0]
 
