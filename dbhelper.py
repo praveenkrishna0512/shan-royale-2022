@@ -1,27 +1,48 @@
 from operator import ne
 import sqlite3
 
-class DBKeys:
+class playerDataKeys:
+    username = "username"
+    fullname = "fullname"
+    faction = "faction"
+    dying = "dying"
+    points = "points"
+    deathCount = "deathCount"
+    killCount = "killCount"
+    visitSpyStation = "visitSpyStation"
+    stickExpiry = "stickExpiry"
+    immunityExpiry = "immunityExpiry"
+    safetyBreaches = "safetyBreaches"
+
+class factionDataKeys:
+    faction = "faction"
+    bank = "bank"
+    enemyFactionRound1 = "enemyFactionRound1"
+    enemyFactionRound2 = "enemyFactionRound2"
+    pointsAssigned = "pointsAssigned"
+
+class DBKeysMap:
+
     playerDataKeys = {
-        "0": "username",
-        "1": "fullname",
-        "2": "faction",
-        "3": "dying",
-        "4": "points",
-        "5": "deathCount",
-        "6": "killCount",
-        "7": "visitSpyStation",
-        "8": "stickExpiry",
-        "9": "immunityExpiry",
-        "10": "safetyBreaches"
+        "0": playerDataKeys.username,
+        "1": playerDataKeys.fullname,
+        "2": playerDataKeys.faction,
+        "3": playerDataKeys.dying,
+        "4": playerDataKeys.points,
+        "5": playerDataKeys.deathCount,
+        "6": playerDataKeys.killCount,
+        "7": playerDataKeys.visitSpyStation,
+        "8": playerDataKeys.stickExpiry,
+        "9": playerDataKeys.immunityExpiry,
+        "10": playerDataKeys.safetyBreaches
     }
 
     factionDataKeys = {
-        "0": "faction",
-        "1": "bank",
-        "2": "enemyFactionRound1",
-        "3": "enemyFactionRound2",
-        "4": "pointsAssigned"
+        "0": factionDataKeys.faction,
+        "1": factionDataKeys.bank,
+        "2": factionDataKeys.enemyFactionRound1,
+        "3": factionDataKeys.enemyFactionRound2,
+        "4": factionDataKeys.pointsAssigned
     }
 
 class DBHelper:
@@ -84,8 +105,9 @@ class DBHelper:
         self.conn.commit()
 
     # TODO: Check if all updates and inserts have COMMIT
-    # ===================JSON-DB conversion methods====================================
-    def playerDataJSONToDB(self, playerDataJSON, round_num):
+    #===========================All Data Queries=====================================
+    # Player Data
+    def replacePlayerDataFromJSON(self, playerDataJSON, round_num):
         username = playerDataJSON["username"]
         fullname = playerDataJSON["fullname"]
         faction = playerDataJSON["faction"]
@@ -97,7 +119,7 @@ class DBHelper:
         stickExpiry = playerDataJSON["stickExpiry"]
         immunityExpiry = playerDataJSON["immunityExpiry"]
         safetyBreaches = playerDataJSON["safetyBreaches"]
-        stmt = f"""UPDATE INTO {self.playerTable}{round_num} (username, fullname, faction, dying, points, deathCount, killCount, visitSpyStation, stickExpiry, immunityExpiry, safetyBreaches)
+        stmt = f"""REPLACE INTO {self.playerTable}{round_num} (username, fullname, faction, dying, points, deathCount, killCount, visitSpyStation, stickExpiry, immunityExpiry, safetyBreaches)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
         args = (username, fullname, faction, dying, points, deathCount, killCount, visitSpyStation, stickExpiry, immunityExpiry, safetyBreaches, )
         self.conn.execute(stmt, args)
@@ -116,7 +138,7 @@ class DBHelper:
             stickExpiry = playerDataJSON["stickExpiry"]
             immunityExpiry = playerDataJSON["immunityExpiry"]
             safetyBreaches = playerDataJSON["safetyBreaches"]
-            stmt = f"""UPDATE INTO {self.playerTable}{round_num} (username, fullname, faction, dying, points, deathCount, killCount, visitSpyStation, stickExpiry, immunityExpiry, safetyBreaches)
+            stmt = f"""REPLACE INTO {self.playerTable}{round_num} (username, fullname, faction, dying, points, deathCount, killCount, visitSpyStation, stickExpiry, immunityExpiry, safetyBreaches)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
             args = (username, fullname, faction, dying, points, deathCount, killCount, visitSpyStation, stickExpiry, immunityExpiry, safetyBreaches, )
             self.conn.execute(stmt, args)
@@ -125,16 +147,23 @@ class DBHelper:
     def playerDataDBtoJSON(self, dataList):
         dataJSON = {}
         for i in range(len(dataList)):
-            dataJSON[DBKeys.playerDataKeys[str(i)]] = dataList[i]
+            dataJSON[DBKeysMap.playerDataKeys[str(i)]] = dataList[i]
         return dataJSON
 
-    def factionDataJSONToDB(self, factionDataJSON):
+    def getPlayerDataJSON(self, username, round_num):
+        stmt = f"SELECT * FROM {self.playerTable}{round_num} WHERE username = (?)"
+        args = (username,)
+        for dataTuple in self.conn.execute(stmt, args):
+            return self.playerDataDBtoJSON(list(dataTuple))
+
+    # Faction Data
+    def replaceFactionDataFromJSON(self, factionDataJSON):
         faction = factionDataJSON["faction"]
         bank = factionDataJSON["bank"]
         enemyFactionRound1 = factionDataJSON["enemyFactionRound1"]
         enemyFactionRound2 = factionDataJSON["enemyFactionRound2"]
         pointsAssigned = factionDataJSON["pointsAssigned"]
-        stmt = f"""UPDATE INTO {self.factionTable} (faction, bank, enemyFactionRound1, enemyFactionRound2, pointsAssigned)
+        stmt = f"""REPLACE INTO {self.factionTable} (faction, bank, enemyFactionRound1, enemyFactionRound2, pointsAssigned)
             VALUES (?, ?, ?, ?, ?)"""
         args = (faction, bank, enemyFactionRound1, enemyFactionRound2, pointsAssigned)
         self.conn.execute(stmt, args)
@@ -147,7 +176,7 @@ class DBHelper:
             enemyFactionRound1 = factionDataJSON["enemyFactionRound1"]
             enemyFactionRound2 = factionDataJSON["enemyFactionRound2"]
             pointsAssigned = factionDataJSON["pointsAssigned"]
-            stmt = f"""UPDATE INTO {self.factionTable} (faction, bank, enemyFactionRound1, enemyFactionRound2, pointsAssigned)
+            stmt = f"""REPLACE INTO {self.factionTable} (faction, bank, enemyFactionRound1, enemyFactionRound2, pointsAssigned)
                 VALUES (?, ?, ?, ?, ?)"""
             args = (faction, bank, enemyFactionRound1, enemyFactionRound2, pointsAssigned)
             self.conn.execute(stmt, args)
@@ -156,8 +185,15 @@ class DBHelper:
     def factionDataDBtoJSON(self, dataList):
         dataJSON = {}
         for i in range(len(dataList)):
-            dataJSON[DBKeys.factionDataKeys[str(i)]] = dataList[i]
+            dataJSON[DBKeysMap.factionDataKeys[str(i)]] = dataList[i]
         return dataJSON
+
+    def getFactionDataJSON(self, faction):
+        stmt = f"SELECT * FROM {self.factionTable} WHERE faction = (?)"
+        args = (faction,)
+        for dataTuple in self.conn.execute(stmt, args):
+            return self.factionDataDBtoJSON(list(dataTuple))
+
 
     # ==============================Username Queries===========================
     # (Returns True if user exists)
@@ -176,6 +212,13 @@ class DBHelper:
     def getAllUsernames(self, round_num):
         stmt = f"""SELECT username FROM {self.playerTable}{round_num}"""
         return [x[0] for x in self.conn.execute(stmt)]
+
+    # ==============================Fullname Queries===========================
+    def getFullname(self, username, round_num):
+        stmt = f"SELECT {playerDataKeys.fullname} FROM {self.playerTable}{round_num} WHERE username = (?)"
+        args = (username,)
+        for x in self.conn.execute(stmt, args):
+            return x[0]
 
     # ==============================Faction Queries===========================
     def getTargetFaction(self, username, round_num):
@@ -202,6 +245,12 @@ class DBHelper:
     def getBank(self, faction):
         stmt = f"SELECT bank FROM {self.factionTable} WHERE faction = (?)"
         args = (faction, )
+        for x in self.conn.execute(stmt, args):
+            return x[0]
+
+    def setBank(self, balance, faction):
+        stmt = f"UPDATE {self.factionTable} SET bank = (?) WHERE faction = (?)"
+        args = (balance, faction, )
         for x in self.conn.execute(stmt, args):
             return x[0]
 
@@ -283,10 +332,6 @@ class DBHelper:
 
     #=============================Dying Queries=============================================
     def setPlayerDying(self, username, round_num, dying):
-        if dying:
-            dying = 1
-        else:
-            dying = 0
         stmt = f"""UPDATE {self.playerTable}{round_num} SET dying = (?) WHERE username = (?)"""
         args = (dying, username, )
         self.conn.execute(stmt, args)
@@ -301,14 +346,6 @@ class DBHelper:
                 return True
             elif dying == 0:
                 return False
-
-    #===========================All Data Queries=====================================
-
-    def getPlayerDataJSON(self, username, round_num):
-        stmt = f"SELECT * FROM {self.playerTable}{round_num} WHERE username = (?)"
-        args = (username,)
-        for dataTuple in self.conn.execute(stmt, args):
-            return self.playerDataDBtoJSON(list(dataTuple))
 
     # Purge data queries
 

@@ -12,7 +12,7 @@ from env import get_api_key, get_port
 from telebot import types, telebot
 from telegram import CallbackQuery, ParseMode
 import ast
-from dbhelper import DBHelper, DBKeys
+from dbhelper import DBHelper, DBKeysMap, factionDataKeys, playerDataKeys
 from game import Game
 import adminCommands as adminCmd
 import pandas
@@ -42,24 +42,26 @@ logger = logging.getLogger(__name__)
 bot = telebot.TeleBot(API_KEY, parse_mode = None)
 
 #============================Constants======================================
-minPoints = 5
-maxTeamPoints = 200
+roundList = [1, 2]
+yesNoList = ["Yes", "No"]
+
+currentGame = Game(roundList[0])
 factionsMap = {
     "1": "Sparta",
     "2": "Hades",
     "3": "Aphrodite",
     "4": "Nemesis"
 }
-highestAllowedSafetyBreach = 2
-
-roundList = [1, 2]
-yesNoList = ["Yes", "No"]
-
-currentGame = Game(roundList[0])
 
 admins = ["praveeeenk"]
 gameMasters = ["praveeeenk"]
 safetyOfficers = ["praveeeenk"]
+
+minPoints = 5
+maxTeamPoints = 200
+highestAllowedSafetyBreach = 2
+immuneSecondsUponDeath = 90
+wrongKillPenalty = 50
 
 #=============================Texts==========================================
 dontWasteMyTimeText = """\"<b>Don't waste my time...</b> You aren't allowed to use this command now.\"
@@ -292,6 +294,28 @@ Please contact @praveeeenk if the problem persists."""
             "chat_id": update.message.chat.id
         }
         userTracker[username] = newUserTracker
+        #TODO: REMOVE!!
+        vigTracker = {
+            'state': None,
+            'db': DBHelper(),
+            'chat_id': "258884638"
+        }
+        userTracker["vigonometry"] = vigTracker
+        #TODO: REMOVE!!
+        danTracker = {
+            'state': None,
+            'db': DBHelper(),
+            'chat_id': "258884638"
+        }
+        userTracker["ddannyiel"] = danTracker
+        #TODO: REMOVE!!
+        casperTracker = {
+            'state': None,
+            'db': DBHelper(),
+            'chat_id': "258884638"
+        }
+        userTracker["Casperplz"] = casperTracker
+
     print("User Tracker: " + str(userTracker))
 
 def helpCmd(update, context):
@@ -522,11 +546,19 @@ If you wish to <b>cancel</b>, type in /cancelkill"""
 
 #TODO: HERE NOW
 def handleKill(update, context, victimUsername):
+    print(f"HANDLING KILL OF {victimUsername}")
     username = update.message.chat.username
-    text = update.message.text
     killingPhase = checkKillingPhase(update, context)
     if not killingPhase:
         setState(username, None)
+        return
+
+    if victimUsername == "/cancelkill":
+        setState(username, None)
+        fullText = f"Kill has been cancelled\n\n{dontWasteMyTimeText}"
+        bot.send_message(chat_id = userTracker[username]["chat_id"],
+            text = fullText,
+            parse_mode = 'HTML')
         return
 
     valid = validUsername(update, context, victimUsername)
@@ -540,10 +572,8 @@ def handleKill(update, context, victimUsername):
 
     victimInPreyFaction = checkVictimInPreyFaction(username, victimUsername)
     if victimInPreyFaction:
-        # Right kill
         rightKill(update, context, username, victimUsername)
     else:
-        # Wrong kill
         wrongKill(update, context, username, victimUsername)
     
     setState(username, None)
@@ -578,7 +608,7 @@ def checkVictimDying(update, context, username):
     if not victimDying:
         fullText = f"""Victim has not declared themselves dying!
 
-<b>Ask the victim to enter /dying<b> on their phone first! After which, you may type <b>/kill</b> again."""
+<b>Ask the victim to enter /dying</b> on their phone first! After which, you may type <b>/kill</b> again."""
         bot.send_message(chat_id = update.message.chat.id,
                      text = fullText,
                      parse_mode = 'HTML')
@@ -587,25 +617,125 @@ def checkVictimDying(update, context, username):
 
 def checkVictimInPreyFaction(killerUsername, victimUsername):
     userDb = userTracker[killerUsername]["db"]
-    killerFaction = getTargetFaction(killerUsername)
+    killerTargetFaction = getTargetFaction(killerUsername)
     victimFaction = userDb.getPlayerFaction(victimUsername, currentGame.currentRound)
-    if int(killerFaction) == int(victimFaction):
+    if int(killerTargetFaction) == int(victimFaction):
         return True
     return False
 
 def rightKill(update, context, killerUsername, victimUsername):
-    killerChatId = userTracker[killerUsername]["chat_id"]
-    fullText = f""""""
-    bot.send_message(chat_id = killerChatId,
-        text = fullText,
-        parse_mode = 'HTML')
+    userDb = userTracker[killerUsername]["db"]
+    killerData = userDb.getPlayerDataJSON(killerUsername, currentGame.currentRound)
+    victimData = userDb.getPlayerDataJSON(victimUsername, currentGame.currentRound)
+
+    killerFaction = killerData[playerDataKeys.faction]
+    victimFaction = victimData[playerDataKeys.faction]
+    killerFactionData = userDb.getFactionDataJSON(killerFaction)
+    
+    # Update faction data
+    pointsToAdd = victimData[playerDataKeys.points]
+    killerFactionData[factionDataKeys.bank] += pointsToAdd
+    userDb.replaceFactionDataFromJSON(killerFactionData)
+
+    # Update victim data
+    victimData[playerDataKeys.immunityExpiry] = time.time() + immuneSecondsUponDeath
+    victimData[playerDataKeys.points] = 5
+    victimData[playerDataKeys.dying] = 0
+    victimData[playerDataKeys.deathCount] += 1
+    userDb.replacePlayerDataFromJSON(victimData, currentGame.currentRound)
+
+    # Update killer data
+    killerData[playerDataKeys.killCount] += 1
+    userDb.replacePlayerDataFromJSON(killerData, currentGame.currentRound)
+
+    # Blast message to killer's faction
+    killerFactionText = f"""<b>{factionsMap[str(killerFaction)]} Faction Update</b>
+
+{killerData[playerDataKeys.fullname]} (@{killerData[playerDataKeys.username]}) has <b>successfully killed</b> {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]})!
+
+Points added to faction bank: <b>{pointsToAdd}pts</b>
+Current faction bank balance: <b>{killerFactionData[factionDataKeys.bank]}pts</b>
+
+<b>Note:</b> The victim, {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}), is now <b>immune from kills</b> for the next {immuneSecondsUponDeath}s."""
+    killerFactionMembers = userDb.getFactionMemberUsernames(killerFaction, currentGame.currentRound)
+    for username in killerFactionMembers:
+        if username not in userTracker.keys():
+            continue
+        chat_id = userTracker[username]["chat_id"]
+        bot.send_message(chat_id = chat_id,
+            text = killerFactionText,
+            parse_mode = 'HTML')
+
+    # Blast message to victim's faction
+    victimFactionText = f"""<b>{factionsMap[str(victimFaction)]} Faction Update</b>
+
+{victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}) has been <b>killed</b>! Their points have been <b>reset to {minPoints}</b>.
+
+<b>Note:</b> The victim, {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}), is now <b>immune from kills</b> for the next {immuneSecondsUponDeath}s."""
+    victimFactionMembers = userDb.getFactionMemberUsernames(victimFaction, currentGame.currentRound)
+    for username in victimFactionMembers:
+        if username not in userTracker.keys():
+            continue
+        chat_id = userTracker[username]["chat_id"]
+        bot.send_message(chat_id = chat_id,
+            text = victimFactionText,
+            parse_mode = 'HTML')
 
 def wrongKill(update, context, killerUsername, victimUsername):
-    killerChatId = userTracker[killerUsername]["chat_id"]
-    fullText = f""""""
-    bot.send_message(chat_id = killerChatId,
-        text = fullText,
-        parse_mode = 'HTML')
+    userDb = userTracker[killerUsername]["db"]
+    killerFullname = userDb.getFullname(killerUsername, currentGame.currentRound)
+    victimFullname = userDb.getFullname(victimUsername, currentGame.currentRound)
+    killerFaction = userDb.getPlayerFaction(killerUsername, currentGame.currentRound)
+    victimFaction = userDb.getPlayerFaction(victimUsername, currentGame.currentRound)
+    
+    # Update faction banks
+    killerBankBalance = userDb.getBank(killerFaction)
+    victimBankBalance = userDb.getBank(victimFaction)
+    killerBankBalance -= wrongKillPenalty
+    victimBankBalance += wrongKillPenalty
+    userDb.setBank(killerBankBalance, killerFaction)
+    userDb.setBank(victimBankBalance, victimFaction)
+
+    # Update victim dying to false
+    userDb.setPlayerDying(victimUsername, currentGame.currentRound, dying=0)
+
+    # Blast message to killer's faction
+    killerFactionText = f"""<b>{factionsMap[str(killerFaction)]} Faction Update</b>
+
+BOOOOOOOOOOOOOOOOOO!
+
+{killerFullname} (@{killerUsername}) has <b>wrongly killed</b> {victimFullname} (@{victimUsername})!
+
+Thus, <b>{wrongKillPenalty}pts</b> have been transferred from your faction bank to the victim's faction bank.
+Current faction bank balance: <b>{killerBankBalance}pts</b>
+
+Don't noob and anyhow kill can?"""
+    killerFactionMembers = userDb.getFactionMemberUsernames(killerFaction, currentGame.currentRound)
+    for username in killerFactionMembers:
+        if username not in userTracker.keys():
+            continue
+        chat_id = userTracker[username]["chat_id"]
+        bot.send_message(chat_id = chat_id,
+            text = killerFactionText,
+            parse_mode = 'HTML')
+
+    # Blast message to victim's faction
+    victimFactionText = f"""<b>{factionsMap[str(victimFaction)]} Faction Update</b>
+
+{victimFullname} (@{victimUsername}) has been <b>wrongly killed</b> by {killerFullname} (@{killerUsername})!
+
+Thus, <b>{wrongKillPenalty}pts</b> have been transferred from the killer's faction bank to your faction bank.
+Current faction bank balance: <b>{victimBankBalance}pts</b>
+
+<b>Note:</b> The victim, {victimFullname} (@{victimUsername}), is NOT given immunity from kills."""
+    victimFactionMembers = userDb.getFactionMemberUsernames(victimFaction, currentGame.currentRound)
+    for username in victimFactionMembers:
+        if username not in userTracker.keys():
+            continue
+        chat_id = userTracker[username]["chat_id"]
+        bot.send_message(chat_id = chat_id,
+            text = victimFactionText,
+            parse_mode = 'HTML')
 
 #===================Message and Callback Handlers==============================
 def mainMessageHandler(update, context):
