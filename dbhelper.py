@@ -330,6 +330,12 @@ class DBHelper:
         for x in self.conn.execute(stmt, args):
             return x[0]
 
+    def getStickExpiry(self, username, round_num):
+        stmt = f"SELECT stickExpiry FROM {self.playerTable}{round_num} WHERE username = (?)"
+        args = (username,)
+        for x in self.conn.execute(stmt, args):
+            return x[0]
+
     #=============================Dying Queries=============================================
     def setPlayerDying(self, username, round_num, dying):
         stmt = f"""UPDATE {self.playerTable}{round_num} SET dying = (?) WHERE username = (?)"""

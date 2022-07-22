@@ -1,4 +1,5 @@
 from calendar import weekday
+from datetime import datetime, timezone
 import enum
 import json
 import logging
@@ -544,7 +545,6 @@ If you wish to <b>cancel</b>, type in /cancelkill"""
                      text = fullText,
                      parse_mode = 'HTML')
 
-#TODO: HERE NOW
 def handleKill(update, context, victimUsername):
     print(f"HANDLING KILL OF {victimUsername}")
     username = update.message.chat.username
@@ -578,6 +578,32 @@ def handleKill(update, context, victimUsername):
     
     setState(username, None)
 
+def stickCmd(update, context):
+    killingPhase = checkKillingPhase(update, context)
+    if not killingPhase:
+        return
+    safe = checkSafetyBreaches(update, context)
+    if not safe:
+        return
+    username = update.message.chat.username
+    immune = checkImmunity(update, context, username)
+    if immune:
+        return
+    stick = checkStick(update, context, username)
+    if not stick:
+        return
+    
+    setState(username, StateEnum.kill)
+
+    fullText = f"""/stick should only be entered <b>once you have "killed" someone else in person.</b>
+
+If you wish to <b>proceed</b>, type in the <b>telegram handle of the victim</b>
+
+If you wish to <b>cancel</b>, type in /cancelkill"""
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     parse_mode = 'HTML')
+
 def checkImmunity(update, context, username):
     userDb = userTracker[username]["db"]
     currentTime = time.time()
@@ -590,6 +616,19 @@ def checkImmunity(update, context, username):
                      parse_mode = 'HTML')
         return True
     return False
+
+def checkStick(update, context, username):
+    userDb = userTracker[username]["db"]
+    currentTime = time.time()
+    playerStickExpiry = userDb.getStickExpiry(username, currentGame.currentRound)
+    expiredForTime = currentTime - playerStickExpiry
+    if expiredForTime > 0:
+        fullText = f"Your stick <b>expired at {datetime.fromtimestamp(playerStickExpiry)}</b>!\n\n(If the time seems inaccurate, its because it may be in GMT+0. If so, add 8 hours to the stated time.)"
+        bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     parse_mode = 'HTML')
+        return False
+    return True
 
 def validUsername(update, context, username):
     chat_id = update.message.chat.id
@@ -904,6 +943,7 @@ def main():
     # Player commands - killing phase
     dp.add_handler(CommandHandler("dying", dyingCmd))
     dp.add_handler(CommandHandler("kill", killCmd))
+    dp.add_handler(CommandHandler("stick", stickCmd))
 
     # Handle all messages
     dp.add_handler(MessageHandler(callback=mainMessageHandler, filters=Filters.all))
