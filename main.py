@@ -802,6 +802,9 @@ Current faction bank balance: <b>{victimBankBalance}pts</b>
 
 #=========================Spystation Mechanism================================
 def visitSpyStationCmd(update, context):
+    killingPhase = checkKillingPhase(update, context)
+    if not killingPhase:
+        return
     playPhase = checkPlayPhase(update, context)
     if not playPhase:
         return
@@ -823,10 +826,9 @@ Are you sure you are visiting the spy station?"""
                      reply_markup = makeInlineKeyboard(yesNoList, OptionIDEnum.visitSpyStation),
                      parse_mode = 'HTML')
 
-#TODO: HERE NOW
 def handleVisitSpyStation(update, context, yesNo):
-    playPhase = checkPlayPhase(update, context, callback=True)
-    if not playPhase:
+    killingPhase = checkKillingPhase(update, context, callback=True)
+    if not killingPhase:
         return
     safe = checkSafetyBreaches(update, context, callback=True)
     if not safe:
@@ -845,8 +847,11 @@ def handleVisitSpyStation(update, context, yesNo):
     username = update.callback_query.message.chat.username
     userDb = userTracker[username]["db"]
     userDb.setPlayerVisitSpyStation(username, currentGame.currentRound, True)
+    playerFaction = userDb.getPlayerFaction(username, currentGame.currentRound)
 
     fullText = f"""<b>You (@{username}) have registered yourself at the Spy Station</b>
+
+Faction Name (ID): {factionsMap[str(playerFaction)]} ({playerFaction})
     
 Show this pass to the game master to proceed with the station activities."""
     bot.edit_message_text(chat_id = chat_id,
@@ -916,10 +921,14 @@ def checkSetPointsPhase(update, context):
         return False
     return True
 
-def checkKillingPhase(update, context):
+def checkKillingPhase(update, context, callback=False):
+    if callback:
+        chat_id = update.callback_query.message.chat.id
+    else:
+        chat_id = update.message.chat.id
     if (not currentGame.play) or (not currentGame.killEnabled):
         fullText = f"Killing phase has not started yet!\n\n{dontWasteMyTimeText}"
-        bot.send_message(chat_id = update.message.chat.id,
+        bot.send_message(chat_id = chat_id,
             text = fullText,
             parse_mode = 'HTML')
         return False
