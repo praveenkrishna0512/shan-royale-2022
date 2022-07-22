@@ -15,7 +15,6 @@ import ast
 from dbhelper import DBHelper
 from game import Game
 import adminCommands as adminCmd
-import excel2json
 import pandas
 
 PORT = get_port()
@@ -493,7 +492,28 @@ You will be informed on the changes in points once the kill is validated."""
                     text = fullText,
                     message_id = message_id,
                     parse_mode = 'HTML')
+    
     return
+
+def killCmd(update, context):
+    killingPhase = checkKillingPhase(update, context)
+    if not killingPhase:
+        return
+    safe = checkSafetyBreaches(update, context)
+    if not safe:
+        return
+    username = update.message.chat.username
+    immune = checkImmunity(update, context, username)
+    if immune:
+        return
+    
+    fullText = f"""/dying should only be entered <b>once you have been "killed" in person by someone else.</b>
+
+Press yes if you wish to proceed."""
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     reply_markup = makeInlineKeyboard(yesNoList, OptionIDEnum.dying),
+                     parse_mode = 'HTML')
 
 def checkImmunity(update, context, username):
     userDb = userTracker[username]["db"]
@@ -671,6 +691,7 @@ def main():
 
     # Player commands - killing phase
     dp.add_handler(CommandHandler("dying", dyingCmd))
+    dp.add_handler(CommandHandler("kill", killCmd))
 
     # Handle all messages
     dp.add_handler(MessageHandler(callback=mainMessageHandler, filters=Filters.all))
