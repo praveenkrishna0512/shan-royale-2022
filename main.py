@@ -79,6 +79,7 @@ class OptionIDEnum(enum.Enum):
     endSetPoints = "endSetPoints"
     endRound = "endRound"
     dying = "dying"
+    visitSpyStation = "visitSpyStation"
 
 # Handles state of the bot for each user
 # Key: username
@@ -416,6 +417,10 @@ def handleSetPoints(update, context, text):
     if not setPointsPhase:
         setState(username, None)
         return
+    
+    safe = checkSafetyBreaches(update, context)
+    if not safe:
+        return
 
     invalid = invalidPoints(chat_id, text)
     if invalid:
@@ -437,6 +442,10 @@ Click <b>/setpoints</b> again to <b>reset</b> points for this round!
 def listPointsCmd(update, context):
     playPhase = checkPlayPhase(update, context)
     if not playPhase:
+        return
+
+    safe = checkSafetyBreaches(update, context)
+    if not safe:
         return
 
     username = update.message.chat.username
@@ -500,6 +509,17 @@ Press yes if you wish to proceed."""
 def handleDying(update, context, yesNo):
     chat_id = update.callback_query.message.chat.id
     message_id = update.callback_query.message.message_id
+    safe = checkSafetyBreaches(update, context)
+    if not safe:
+        return
+    killingPhase = checkKillingPhase(update, context)
+    if not killingPhase:
+        setState(username, None)
+        return
+    username = update.message.chat.username
+    immune = checkImmunity(update, context, username)
+    if immune:
+        return
     if yesNo == yesNoList[1]:
         # "No" was pressed
         bot.edit_message_text(chat_id = chat_id,
@@ -519,8 +539,6 @@ You will be informed on the changes in points once the kill is validated."""
                     text = fullText,
                     message_id = message_id,
                     parse_mode = 'HTML')
-    
-    return
 
 def killCmd(update, context):
     killingPhase = checkKillingPhase(update, context)
@@ -551,6 +569,9 @@ def handleKill(update, context, victimUsername):
     killingPhase = checkKillingPhase(update, context)
     if not killingPhase:
         setState(username, None)
+        return
+    safe = checkSafetyBreaches(update, context)
+    if not safe:
         return
 
     if victimUsername == "/cancelkill":
@@ -595,7 +616,9 @@ def stickCmd(update, context):
     
     setState(username, StateEnum.kill)
 
-    fullText = f"""/stick should only be entered <b>once you have "killed" someone else in person.</b>
+    fullText = f"""You are about to use your stick to initiate a kill.
+
+/stick should only be entered <b>once you have "killed" someone else in person.</b>
 
 If you wish to <b>proceed</b>, type in the <b>telegram handle of the victim</b>
 
@@ -644,6 +667,7 @@ def validUsername(update, context, username):
 def checkVictimDying(update, context, username):
     userDb = userTracker[username]["db"]
     victimDying = userDb.getPlayerDying(username, currentGame.currentRound)
+
     if not victimDying:
         fullText = f"""Victim has not declared themselves dying!
 
@@ -736,7 +760,7 @@ def wrongKill(update, context, killerUsername, victimUsername):
     userDb.setBank(victimBankBalance, victimFaction)
 
     # Update victim dying to false
-    userDb.setPlayerDying(victimUsername, currentGame.currentRound, dying=0)
+    userDb.setPlayerDying(victimUsername, currentGame.currentRound, False)
 
     # Blast message to killer's faction
     killerFactionText = f"""<b>{factionsMap[str(killerFaction)]} Faction Update</b>
@@ -776,6 +800,72 @@ Current faction bank balance: <b>{victimBankBalance}pts</b>
             text = victimFactionText,
             parse_mode = 'HTML')
 
+#=========================Spystation Mechanism================================
+def visitSpyStationCmd(update, context):
+    playPhase = checkPlayPhase(update, context)
+    if not playPhase:
+        return
+    safe = checkSafetyBreaches(update, context)
+    if not safe:
+        return
+    username = update.message.chat.username
+    visited = visitedSpyStation(update, context, username)
+    if visited:
+        return
+    
+    fullText = f"""/visitSpyStation should only be entered <b>once you are going to engage with the game master at the spy station</b>
+
+You may only visit the spy station <b>once per round</b>.
+
+Are you sure you are visiting the spy station?"""
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     reply_markup = makeInlineKeyboard(yesNoList, OptionIDEnum.visitSpyStation),
+                     parse_mode = 'HTML')
+
+#TODO: HERE NOW
+def handleVisitSpyStation(update, context, yesNo):
+    playPhase = checkPlayPhase(update, context, callback=True)
+    if not playPhase:
+        return
+    safe = checkSafetyBreaches(update, context, callback=True)
+    if not safe:
+        return
+
+    chat_id = update.callback_query.message.chat.id
+    message_id = update.callback_query.message.message_id
+    if yesNo == yesNoList[1]:
+        # "No" was pressed
+        bot.edit_message_text(chat_id = chat_id,
+                     text = dontWasteMyTimeText,
+                     message_id = message_id,
+                     parse_mode = 'HTML')
+        return
+    # "Yes" was pressed
+    username = update.callback_query.message.chat.username
+    userDb = userTracker[username]["db"]
+    userDb.setPlayerVisitSpyStation(username, currentGame.currentRound, True)
+
+    fullText = f"""<b>You (@{username}) have registered yourself at the Spy Station</b>
+    
+Show this pass to the game master to proceed with the station activities."""
+    bot.edit_message_text(chat_id = chat_id,
+                    text = fullText,
+                    message_id = message_id,
+                    parse_mode = 'HTML')
+    
+def visitedSpyStation(update, context, username):
+    userDb = userTracker[username]["db"]
+    visitedSpyStation = userDb.getPlayerVisitSpyStation(username, currentGame.currentRound)
+
+    if visitedSpyStation:
+        fullText = f"""You have visited the spy station in this round!\n\n{dontWasteMyTimeText}"""
+        bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     parse_mode = 'HTML')
+        return True
+    return False
+
 #===================Message and Callback Handlers==============================
 def mainMessageHandler(update, context):
     username = update.message.chat.username
@@ -809,6 +899,9 @@ def mainCallBackHandler(update, context):
     if optionID == str(OptionIDEnum.dying):
         handleDying(update, context, value)
         return
+    if optionID == str(OptionIDEnum.visitSpyStation):
+        handleVisitSpyStation(update, context, value)
+        return
     else:
         print(f'ERROR IN CALLBACKHANDLER: No such optionID defined ({optionID})\nValue: {value}')
         return
@@ -832,10 +925,14 @@ def checkKillingPhase(update, context):
         return False
     return True
 
-def checkPlayPhase(update, context):
+def checkPlayPhase(update, context, callback=False):
+    if callback:
+        chat_id = update.callback_query.message.chat.id
+    else:
+        chat_id = update.message.chat.id
     if not currentGame.play:
         fullText = f"Round has not started yet!\n\n{dontWasteMyTimeText}"
-        bot.send_message(chat_id = update.message.chat.id,
+        bot.send_message(chat_id = chat_id,
             text = fullText,
             parse_mode = 'HTML')
         return False
@@ -872,14 +969,19 @@ def checkSafety(update, context, username):
                      parse_mode = 'HTML')
     return False
 
-def checkSafetyBreaches(update, context):
-    username = update.message.chat.username
+def checkSafetyBreaches(update, context, callback=False):
+    if callback:
+        chat_id = update.callback_query.message.chat.id
+        username = update.callback_query.message.chat.username
+    else:
+        chat_id = update.message.chat.id
+        username = update.message.chat.username
     cumulativePlayerSafetyBreaches = getPlayerSafetyBreaches(username)
     if cumulativePlayerSafetyBreaches < highestAllowedSafetyBreach:
         return True
     
     fullText = f"You have a total of {cumulativePlayerSafetyBreaches} Safety Breaches! You may not play the game.\n\n{dontWasteMyTimeText}"
-    bot.send_message(chat_id = update.message.chat.id,
+    bot.send_message(chat_id = chat_id,
                      text = fullText,
                      parse_mode = 'HTML')
     return False
@@ -930,7 +1032,7 @@ def main():
     dp.add_handler(CommandHandler("adminEndSetPoints", adminEndSetPointsCmd))
     dp.add_handler(CommandHandler("adminEndRound", adminEndRoundCmd))
 
-    # Player commands
+    # Player commands - general
     dp.add_handler(CommandHandler("start", startCmd))
     dp.add_handler(CommandHandler("help", helpCmd))
     dp.add_handler(CommandHandler("faction", factionCmd))
@@ -944,6 +1046,9 @@ def main():
     dp.add_handler(CommandHandler("dying", dyingCmd))
     dp.add_handler(CommandHandler("kill", killCmd))
     dp.add_handler(CommandHandler("stick", stickCmd))
+
+    # Player commands - spystation
+    dp.add_handler(CommandHandler("visitSpyStation", visitSpyStationCmd))
 
     # Handle all messages
     dp.add_handler(MessageHandler(callback=mainMessageHandler, filters=Filters.all))

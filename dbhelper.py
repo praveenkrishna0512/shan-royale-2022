@@ -336,6 +336,24 @@ class DBHelper:
         for x in self.conn.execute(stmt, args):
             return x[0]
 
+    def setStickExpiry(self, username, round_num, stickExpiry):
+        stmt = f"""UPDATE {self.playerTable}{round_num} SET stickExpiry = (?) WHERE username = (?)"""
+        args = (stickExpiry, username, )
+        self.conn.execute(stmt, args)
+        self.conn.commit()
+
+    def getPlayerVisitSpyStation(self, username, round_num):
+        stmt = f"SELECT visitSpyStation FROM {self.playerTable}{round_num} WHERE username = (?)"
+        args = (username,)
+        for x in self.conn.execute(stmt, args):
+            return x[0]
+
+    def setPlayerVisitSpyStation(self, username, round_num, visited):
+        stmt = f"""UPDATE {self.playerTable}{round_num} SET visitSpyStation = (?) WHERE username = (?)"""
+        args = (visited, username, )
+        self.conn.execute(stmt, args)
+        self.conn.commit()
+
     #=============================Dying Queries=============================================
     def setPlayerDying(self, username, round_num, dying):
         stmt = f"""UPDATE {self.playerTable}{round_num} SET dying = (?) WHERE username = (?)"""
@@ -343,15 +361,11 @@ class DBHelper:
         self.conn.execute(stmt, args)
         self.conn.commit()
 
-    def getPlayerDying(self, username, round_num) -> bool:
+    def getPlayerDying(self, username, round_num):
         stmt = f"""SELECT dying FROM {self.playerTable}{round_num} WHERE username = (?)"""
         args = (username, )
         for x in self.conn.execute(stmt, args):
-            dying = x[0]
-            if dying == 1:
-                return True
-            elif dying == 0:
-                return False
+            return x[0]
 
     # Purge data queries
 
