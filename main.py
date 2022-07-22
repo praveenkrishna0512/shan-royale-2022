@@ -9,7 +9,6 @@ import this
 import time
 from tracemalloc import BaseFilter
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
-from click import option
 from env import get_api_key, get_port
 import telebot
 from telebot import types
