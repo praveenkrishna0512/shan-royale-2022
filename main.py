@@ -5,13 +5,11 @@ import logging
 from os import kill
 from sqlite3 import Time
 from tabnanny import check
-import this
 import time
 from tracemalloc import BaseFilter
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 from env import get_api_key, get_port
-import telebot
-from telebot import types
+from telebot import types, telebot
 from telegram import CallbackQuery, ParseMode
 import ast
 from dbhelper import DBHelper
