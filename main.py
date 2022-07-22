@@ -687,9 +687,9 @@ def main():
 
     # Start the Bot
     updater.start_webhook(listen="0.0.0.0",
-                        port=int(PORT),
-                        url_path=str(API_KEY))
-    updater.bot.setWebhook('https://radiant-inlet-41935.herokuapp.com/' + str(API_KEY))
+                      port=int(PORT),
+                      url_path=str(API_KEY),
+                      webhook_url='https://yourherokuappname.herokuapp.com/' + str(API_KEY))
 
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT. This should be used most of the time, since

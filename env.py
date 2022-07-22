@@ -6,4 +6,4 @@ def get_api_key():
     return os.getenv('API_KEY')
 
 def get_port():
-    return int(os.environ.get('PORT', 5000))
+    return int(os.environ.get('PORT', 80))
