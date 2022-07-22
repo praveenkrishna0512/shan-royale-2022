@@ -12,7 +12,7 @@ from env import get_api_key, get_port
 from telebot import types, telebot
 from telegram import CallbackQuery, ParseMode
 import ast
-from dbhelper import DBHelper
+from dbhelper import DBHelper, DBKeys
 from game import Game
 import adminCommands as adminCmd
 import pandas
@@ -28,9 +28,9 @@ playerDataRound1JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name
 playerDataRound2JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="playerDataRound2").to_json(orient='records'))
 factionDataJSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="factionData").to_json(orient='records'))
 mainDb = DBHelper()
-mainDb.processPlayerDataJSONArr(playerDataRound1JSONArr, 1)
-mainDb.processPlayerDataJSONArr(playerDataRound2JSONArr, 2)
-mainDb.processFactionDataJSONArr(factionDataJSONArr)
+mainDb.playerDataJSONArrToDB(playerDataRound1JSONArr, 1)
+mainDb.playerDataJSONArrToDB(playerDataRound2JSONArr, 2)
+mainDb.factionDataJSONArrToDB(factionDataJSONArr)
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -69,6 +69,7 @@ dontWasteMyTimeText = """\"<b>Don't waste my time...</b> You aren't allowed to u
 # Possible states
 class StateEnum(enum.Enum):
     setPoints = "setPoints"
+    kill = "kill"
 
 class OptionIDEnum(enum.Enum):
     beginRound = "beginRound"
@@ -388,10 +389,11 @@ def handleSetPoints(update, context, text):
     text = update.message.text
     setPointsPhase = checkSetPointsPhase(update, context)
     if not setPointsPhase:
+        setState(username, None)
         return
 
     invalid = invalidPoints(chat_id, text)
-    if invalid: 
+    if invalid:
         return
     points = int(text)
 
@@ -507,13 +509,44 @@ def killCmd(update, context):
     if immune:
         return
     
-    fullText = f"""/dying should only be entered <b>once you have been "killed" in person by someone else.</b>
+    setState(username, StateEnum.kill)
 
-Press yes if you wish to proceed."""
+    fullText = f"""/kill should only be entered <b>once you have "killed" someone else in person.</b>
+
+If you wish to <b>proceed</b>, type in the <b>telegram handle of the victim</b>
+
+If you wish to <b>cancel</b>, type in /cancelkill"""
     bot.send_message(chat_id = update.message.chat.id,
                      text = fullText,
-                     reply_markup = makeInlineKeyboard(yesNoList, OptionIDEnum.dying),
                      parse_mode = 'HTML')
+
+#TODO: HERE NOW
+def handleKill(update, context, victimUsername):
+    username = update.message.chat.username
+    text = update.message.text
+    killingPhase = checkKillingPhase(update, context)
+    if not killingPhase:
+        setState(username, None)
+        return
+
+    valid = validUsername(update, context, victimUsername)
+    if not valid:
+        return
+
+    victimDying = checkVictimDying(update, context, victimUsername)
+    if not victimDying:
+        setState(username, None)
+        return
+
+    victimInPreyFaction = checkVictimInPreyFaction(username, victimUsername)
+    if victimInPreyFaction:
+        # Right kill
+        rightKill(update, context, username, victimUsername)
+    else:
+        # Wrong kill
+        wrongKill(update, context, username, victimUsername)
+    
+    setState(username, None)
 
 def checkImmunity(update, context, username):
     userDb = userTracker[username]["db"]
@@ -521,12 +554,58 @@ def checkImmunity(update, context, username):
     playerImmunityExpiry = userDb.getImmunityExpiry(username, currentGame.currentRound)
     remainingTime = playerImmunityExpiry - currentTime
     if remainingTime > 0:
-        fullText = f"You are still immune for {remainingTime} seconds!\n\nYou may not be killed"
+        fullText = f"You are still immune for {remainingTime} seconds!\n\nYou may not be killed or kill!"
         bot.send_message(chat_id = update.message.chat.id,
                      text = fullText,
                      parse_mode = 'HTML')
         return True
     return False
+
+def validUsername(update, context, username):
+    chat_id = update.message.chat.id
+    if not username in userTracker.keys():
+        txt = "The victim has not started the game! <b>Ask them to press /start</b>"
+        bot.send_message(chat_id = chat_id,
+            text = txt,
+            parse_mode = 'HTML')
+        return False
+
+    return True
+
+def checkVictimDying(update, context, username):
+    userDb = userTracker[username]["db"]
+    victimDying = userDb.getPlayerDying(username, currentGame.currentRound)
+    if not victimDying:
+        fullText = f"""Victim has not declared themselves dying!
+
+<b>Ask the victim to enter /dying<b> on their phone first! After which, you may type <b>/kill</b> again."""
+        bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     parse_mode = 'HTML')
+        return False
+    return True
+
+def checkVictimInPreyFaction(killerUsername, victimUsername):
+    userDb = userTracker[killerUsername]["db"]
+    killerFaction = getTargetFaction(killerUsername)
+    victimFaction = userDb.getPlayerFaction(victimUsername, currentGame.currentRound)
+    if int(killerFaction) == int(victimFaction):
+        return True
+    return False
+
+def rightKill(update, context, killerUsername, victimUsername):
+    killerChatId = userTracker[killerUsername]["chat_id"]
+    fullText = f""""""
+    bot.send_message(chat_id = killerChatId,
+        text = fullText,
+        parse_mode = 'HTML')
+
+def wrongKill(update, context, killerUsername, victimUsername):
+    killerChatId = userTracker[killerUsername]["chat_id"]
+    fullText = f""""""
+    bot.send_message(chat_id = killerChatId,
+        text = fullText,
+        parse_mode = 'HTML')
 
 #===================Message and Callback Handlers==============================
 def mainMessageHandler(update, context):
@@ -536,6 +615,9 @@ def mainMessageHandler(update, context):
     match currentState:
         case StateEnum.setPoints:
             handleSetPoints(update, context, text)
+            return
+        case StateEnum.kill:
+            handleKill(update, context, text)
             return
         case _:
             print(f'ERROR IN MSGHANDLER: No such state defined ({currentState})\nText: {text}')
@@ -704,15 +786,15 @@ def main():
     dp.add_error_handler(error)
 
     # Start the Bot
-    updater.start_webhook(listen="0.0.0.0",
-                      port=int(PORT),
-                      url_path=str(API_KEY),
-                      webhook_url='https://radiant-inlet-41935.herokuapp.com/' + str(API_KEY))
+    # updater.start_webhook(listen="0.0.0.0",
+    #                   port=int(PORT),
+    #                   url_path=str(API_KEY),
+    #                   webhook_url='https://radiant-inlet-41935.herokuapp.com/' + str(API_KEY))
 
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT. This should be used most of the time, since
     # start_polling() is non-blocking and will stop the bot gracefully.
-    # updater.start_polling()
+    updater.start_polling()
 
     #TODO: Update Excel sheet every once in a while
 
