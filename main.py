@@ -134,7 +134,7 @@ def makeInlineKeyboard(lst, optionID):
 # ====================== Admin Commands ===============================
 def adminBeginRoundCmd(update, context):
     username = update.message.chat.username
-    isAdmin = checkSafety(update, context, username)
+    isAdmin = checkAdmin(update, context, username)
     if not isAdmin:
         return
 
@@ -175,7 +175,7 @@ Enjoy!"""
 
 def adminEndSetPointsCmd(update, context):
     username = update.message.chat.username
-    isAdmin = checkSafety(update, context, username)
+    isAdmin = checkAdmin(update, context, username)
     if not isAdmin:
         return
 
@@ -246,7 +246,7 @@ Enjoy!"""
 
 def adminEndRoundCmd(update, context):
     username = update.message.chat.username
-    isAdmin = checkSafety(update, context, username)
+    isAdmin = checkAdmin(update, context, username)
     if not isAdmin:
         return
 
@@ -298,7 +298,7 @@ If there are no more round, hope you enjoyed the game and please gather at your 
 # TODO: Showing player text is too long, figure out if Casper needs it
 def adminFactionDetails(update, context):
     username = update.message.chat.username
-    isAdmin = checkSafety(update, context, username)
+    isAdmin = checkAdmin(update, context, username)
     if not isAdmin:
         return
 
@@ -346,7 +346,7 @@ def adminFactionDetails(update, context):
 
 def adminAddPoints(update, context):
     username = update.message.chat.username
-    isAdmin = checkSafety(update, context, username)
+    isAdmin = checkAdmin(update, context, username)
     if not isAdmin:
         return
     fullText = f"""You are about to <b>add points</b> for a faction
@@ -365,7 +365,7 @@ Please press the <b>ID of the faction</b> you are querying for.
 
 def askAdminAddPoints(update, context, faction):
     username = update.callback_query.message.chat.username
-    isAdmin = checkSafety(update, context, username)
+    isAdmin = checkAdmin(update, context, username)
     if not isAdmin:
         return
 
@@ -387,7 +387,7 @@ def askAdminAddPoints(update, context, faction):
 def handleAdminAddPoints(update, context, points):
     username = update.message.chat.username
     chat_id = update.message.chat.id
-    isAdmin = checkSafety(update, context, username)
+    isAdmin = checkAdmin(update, context, username)
     if not isAdmin:
         return
 
@@ -425,7 +425,7 @@ Current bank balance: {factionBankBalance}
 
 def adminBroadcast(update, context):
     username = update.message.chat.username
-    isAdmin = checkSafety(update, context, username)
+    isAdmin = checkAdmin(update, context, username)
     if not isAdmin:
         return
     setState(username, StateEnum.adminBroadcast)
@@ -438,7 +438,7 @@ To cancel, type in /cancelBroadcast"""
 
 def handleAdminBroadcast(update, context, text):
     username = update.message.chat.username
-    isAdmin = checkSafety(update, context, username)
+    isAdmin = checkAdmin(update, context, username)
     if not isAdmin:
         return
 
@@ -465,7 +465,7 @@ def pumpAdminBroadcast(update, context, yesNo):
     username = update.callback_query.message.chat.username
     chat_id =update.callback_query.message.chat.id
     message_id =update.callback_query.message.message_id
-    isAdmin = checkSafety(update, context, username)
+    isAdmin = checkAdmin(update, context, username)
     if not isAdmin:
         return
 
@@ -659,16 +659,49 @@ Please contact @praveeeenk if the problem persists."""
     print("User Tracker: " + str(userTracker))
 
 def helpCmd(update, context):
-    """Send a message when the command /help is issued."""
-    txt1 = "Here are the suppported individual commands:\n"
-    txt2 = """<b>/setpoints</b> - Set/Reset your points for current round in Shan Royale
+    playerCmds = """Here are the suppported player commands:\n
+<b>/start</b> - Register yourself and start playing!
+<b>/help</b> - List all available commands
+<b>/faction</b> - See details about your faction
+<b>/listbanks</b> - List the bank balances of all factions
+<b>/setpoints</b> - Set/Reset your points for current round in Shan Royale
 <b>/listpoints</b> - List your faction members' points for current round in Shan Royale
-\n"""
-    txt3 = "Here are the support admin commands:\n"
-    txt4 = """<b>/adminBeginRound</b> - Begin the Set Points phase for a round!
-<b>/adminEndSetPoints</b> - End the Set Points phase and begin Killing phase for the current round!
-<b>/adminEndRound</b> - End the Round despite the phase"""
-    fullText = txt1 + txt2 + txt3 + txt4
+<b>/dying</b> - Set yourself as dying
+<b>/kill</b> - Initiate a kill on someone
+<b>/stick</b> - Use your stick to initiate a kill on someone
+<b>/visitspystation</b> - Record your visit to the spy station
+"""
+
+    gamemasterCmds = """Here are the suppported game master commands:\n
+<b>/tier1a</b> - Get Tier 1a information
+<b>/tier1b</b> - Get Tier 1b information
+<b>/tier2a</b> - Get Tier 2a information
+<b>/tier2b</b> - Get Tier 2b information
+<b>/tier3a</b> - Get Tier 3a information
+<b>/tier3b</b> - Get Tier 3b information
+<b>/givestick</b> - Give stick to a player
+<b>/checkstick</b> - Check how many sticks have been given out
+<b>/elimination</b> - Eliminate a player upon request
+"""
+
+    safetyCmds = """Here are the suppported safety officer commands:\n
+<b>/yellowcard</b> - Give a player a yellow card
+<b>/redcard</b> - Give a player a red card
+"""
+
+    adminCmds = """Here are the supported admin commands:
+<b>/adminbeginround</b> - Begin the Set Points phase for a round
+<b>/adminendsetpoints</b> - End the Set Points phase and begin Killing phase for the current round
+<b>/adminendround</b> - End the Round despite the phase
+<b>/adminfactiondetails</b> - Get summary of all faction details
+<b>/adminaddpoints</b> - Add points to a faction's bank
+<b>/adminbroadcast</b> - Broadcast a message
+"""
+
+    username = update.message.chat.username
+    isAdmin = isAdmin
+
+    fullText = playerCmds + adminCmds
     update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
 
 def error(update, context):
@@ -1915,7 +1948,7 @@ def checkPlayPhase(update, context, callback=False):
     return True
 
 #=========================Authentication helpers=======================
-def checkSafety(update, context, username):
+def checkAdmin(update, context, username):
     if username in admins:
         return True
     
@@ -2027,18 +2060,18 @@ def main():
     dp = updater.dispatcher
 
     # Admin commands
-    dp.add_handler(CommandHandler("adminBeginRound", adminBeginRoundCmd))
-    dp.add_handler(CommandHandler("adminEndSetPoints", adminEndSetPointsCmd))
-    dp.add_handler(CommandHandler("adminEndRound", adminEndRoundCmd))
-    dp.add_handler(CommandHandler("adminFactionDetails", adminFactionDetails))
-    dp.add_handler(CommandHandler("adminAddPoints", adminAddPoints))
-    dp.add_handler(CommandHandler("adminBroadcast", adminBroadcast))
+    dp.add_handler(CommandHandler("adminbeginround", adminBeginRoundCmd))
+    dp.add_handler(CommandHandler("adminendsetpoints", adminEndSetPointsCmd))
+    dp.add_handler(CommandHandler("adminendround", adminEndRoundCmd))
+    dp.add_handler(CommandHandler("adminfactiondetails", adminFactionDetails))
+    dp.add_handler(CommandHandler("adminaddpoints", adminAddPoints))
+    dp.add_handler(CommandHandler("adminbroadcast", adminBroadcast))
 
     # Player commands - general
     dp.add_handler(CommandHandler("start", startCmd))
     dp.add_handler(CommandHandler("help", helpCmd))
     dp.add_handler(CommandHandler("faction", factionCmd))
-    dp.add_handler(CommandHandler("listBanks", listBanksCmd))
+    dp.add_handler(CommandHandler("listbanks", listBanksCmd))
 
     # Player commands - set points phase
     dp.add_handler(CommandHandler("setpoints", setPointsCmd))
@@ -2050,7 +2083,7 @@ def main():
     dp.add_handler(CommandHandler("stick", stickCmd))
 
     # Player commands - spystation
-    dp.add_handler(CommandHandler("visitSpyStation", visitSpyStationCmd))
+    dp.add_handler(CommandHandler("visitspystation", visitSpyStationCmd))
 
     # Game Master commands - spystation
     dp.add_handler(CommandHandler("tier1a", tier1aCmd))
@@ -2059,13 +2092,13 @@ def main():
     dp.add_handler(CommandHandler("tier2b", tier2bCmd))
     dp.add_handler(CommandHandler("tier3a", tier3aCmd))
     dp.add_handler(CommandHandler("tier3b", tier3bCmd))
-    dp.add_handler(CommandHandler("giveStick", giveStickCmd))
-    dp.add_handler(CommandHandler("checkStick", checkStickCmd))
+    dp.add_handler(CommandHandler("givestick", giveStickCmd))
+    dp.add_handler(CommandHandler("checkstick", checkStickCmd))
     dp.add_handler(CommandHandler("elimination", eliminationCmd))
 
     # Safety commands
-    dp.add_handler(CommandHandler("yellowCard", yellowCardCmd))
-    dp.add_handler(CommandHandler("redCard", redCardCmd))
+    dp.add_handler(CommandHandler("yellowcard", yellowCardCmd))
+    dp.add_handler(CommandHandler("redcard", redCardCmd))
 
     # Handle all messages
     dp.add_handler(MessageHandler(callback=mainMessageHandler, filters=Filters.all))
