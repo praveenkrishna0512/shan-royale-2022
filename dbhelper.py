@@ -332,6 +332,12 @@ class DBHelper:
         for x in self.conn.execute(stmt, args):
             return x[0]
 
+    def setPlayerSafetyBreaches(self, username, round_num, safetyBreaches):
+        stmt = f"""UPDATE {self.playerTable}{round_num} SET safetyBreaches = (?) WHERE username = (?)"""
+        args = (safetyBreaches, username, )
+        self.conn.execute(stmt, args)
+        self.conn.commit()
+
     #==============================Expiry Queries===============================================
     def getImmunityExpiry(self, username, round_num):
         stmt = f"SELECT immunityExpiry FROM {self.playerTable}{round_num} WHERE username = (?)"

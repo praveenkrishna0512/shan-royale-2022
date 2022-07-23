@@ -58,8 +58,8 @@ factionsMap = {
 }
 
 admins = ["praveeeenk", "Casperplz"]
-gameMasters = ["praveeeenk", "Casperplz"]
-safetyOfficers = ["praveeeenk", "Casperplz"]
+gameMasters = ["praveeeenk", "Casperplz", "ddannyiel", "Jobeet", "kelsykoh", "keziakhoo", "vigonometry"]
+safetyOfficers = ["praveeeenk", "Casperplz", "ddannyiel", "Jobeet"]
 
 adminQuery = {}
 
@@ -91,6 +91,8 @@ class StateEnum(enum.Enum):
     elimination = "elimination"
     adminAddPoints = "adminAddPoints"
     adminBroadcast = "adminBroadcast"
+    yellowCard = "yellowCard"
+    redCard = "redCard"
 
 class OptionIDEnum(enum.Enum):
     beginRound = "beginRound"
@@ -132,7 +134,7 @@ def makeInlineKeyboard(lst, optionID):
 # ====================== Admin Commands ===============================
 def adminBeginRoundCmd(update, context):
     username = update.message.chat.username
-    isAdmin = checkAdmin(update, context, username)
+    isAdmin = checkSafety(update, context, username)
     if not isAdmin:
         return
 
@@ -173,7 +175,7 @@ Enjoy!"""
 
 def adminEndSetPointsCmd(update, context):
     username = update.message.chat.username
-    isAdmin = checkAdmin(update, context, username)
+    isAdmin = checkSafety(update, context, username)
     if not isAdmin:
         return
 
@@ -244,7 +246,7 @@ Enjoy!"""
 
 def adminEndRoundCmd(update, context):
     username = update.message.chat.username
-    isAdmin = checkAdmin(update, context, username)
+    isAdmin = checkSafety(update, context, username)
     if not isAdmin:
         return
 
@@ -296,7 +298,7 @@ If there are no more round, hope you enjoyed the game and please gather at your 
 # TODO: Showing player text is too long, figure out if Casper needs it
 def adminFactionDetails(update, context):
     username = update.message.chat.username
-    isAdmin = checkAdmin(update, context, username)
+    isAdmin = checkSafety(update, context, username)
     if not isAdmin:
         return
 
@@ -344,7 +346,7 @@ def adminFactionDetails(update, context):
 
 def adminAddPoints(update, context):
     username = update.message.chat.username
-    isAdmin = checkAdmin(update, context, username)
+    isAdmin = checkSafety(update, context, username)
     if not isAdmin:
         return
     fullText = f"""You are about to <b>add points</b> for a faction
@@ -363,7 +365,7 @@ Please press the <b>ID of the faction</b> you are querying for.
 
 def askAdminAddPoints(update, context, faction):
     username = update.callback_query.message.chat.username
-    isAdmin = checkAdmin(update, context, username)
+    isAdmin = checkSafety(update, context, username)
     if not isAdmin:
         return
 
@@ -385,7 +387,7 @@ def askAdminAddPoints(update, context, faction):
 def handleAdminAddPoints(update, context, points):
     username = update.message.chat.username
     chat_id = update.message.chat.id
-    isAdmin = checkAdmin(update, context, username)
+    isAdmin = checkSafety(update, context, username)
     if not isAdmin:
         return
 
@@ -423,7 +425,7 @@ Current bank balance: {factionBankBalance}
 
 def adminBroadcast(update, context):
     username = update.message.chat.username
-    isAdmin = checkAdmin(update, context, username)
+    isAdmin = checkSafety(update, context, username)
     if not isAdmin:
         return
     setState(username, StateEnum.adminBroadcast)
@@ -436,7 +438,7 @@ To cancel, type in /cancelBroadcast"""
 
 def handleAdminBroadcast(update, context, text):
     username = update.message.chat.username
-    isAdmin = checkAdmin(update, context, username)
+    isAdmin = checkSafety(update, context, username)
     if not isAdmin:
         return
 
@@ -454,7 +456,7 @@ def handleAdminBroadcast(update, context, text):
     }
 
     fullText = f"Is this okay sir/maam?\n\n{text}'"
-    bot.send_message(chat_id = update.callback_query.message.chat.id,
+    bot.send_message(chat_id = update.message.chat.id,
                      text = fullText,
                      reply_markup = makeInlineKeyboard(yesNoList, OptionIDEnum.adminBroadcast),
                      parse_mode = 'HTML')
@@ -463,7 +465,7 @@ def pumpAdminBroadcast(update, context, yesNo):
     username = update.callback_query.message.chat.username
     chat_id =update.callback_query.message.chat.id
     message_id =update.callback_query.message.message_id
-    isAdmin = checkAdmin(update, context, username)
+    isAdmin = checkSafety(update, context, username)
     if not isAdmin:
         return
 
@@ -489,6 +491,113 @@ def pumpAdminBroadcast(update, context, yesNo):
     adminQuery[username][StateEnum.adminBroadcast] = ""
     setState(username, None)
     return
+
+#===========================Safety Officer Comands===========================================
+def yellowCardCmd(update, context):
+    username = update.message.chat.username
+    isSafety = checkSafety(update, context, username)
+    if not isSafety:
+        return
+    
+    setState(username, StateEnum.yellowCard)
+
+    fullText = f"""<b>You are about to award someone a yellow card (1 Safety Breach)</b>
+
+If you wish to <b>proceed</b>, type in the <b>telegram handle of the offender</b>
+
+If you wish to <b>cancel</b>, type in /cancelCard"""
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     parse_mode = 'HTML')
+
+def handleYellowCard(update, context, offenderUsername):
+    print(f"HANDLING YELLOW CARD OF {offenderUsername}")
+    username = update.message.chat.username
+    isSafety = checkSafety(update, context, username)
+    if not isSafety:
+        return
+
+    if offenderUsername == "/cancelCard":
+        setState(username, None)
+        fullText = f"Yellow/Red Card has been cancelled\n\n{dontWasteMyTimeText}"
+        bot.send_message(chat_id = userTracker[username]["chat_id"],
+            text = fullText,
+            parse_mode = 'HTML')
+        return
+
+    valid = validUsername(update, context, offenderUsername)
+    if not valid:
+        return
+
+    userDb = userTracker[username]["db"]
+    currentSafetyBreaches = userDb.getPlayerSafetyBreaches(offenderUsername, currentGame.currentRound)
+    currentSafetyBreaches += 1
+    userDb.setPlayerSafetyBreaches(offenderUsername, currentGame.currentRound, currentSafetyBreaches)
+
+    fullText = f"""@{offenderUsername} has been given a yellow Card, and now has {currentSafetyBreaches} safety breaches!
+
+2 Safety Breaches, and you are out!"""
+    bot.send_message(chat_id = update.message.chat.id,
+        text = fullText,
+        parse_mode = 'HTML')
+    bot.send_message(chat_id = userTracker[offenderUsername]["chat_id"],
+        text = fullText,
+        parse_mode = 'HTML')
+    
+    setState(username, None)
+
+def redCardCmd(update, context):
+    username = update.message.chat.username
+    isSafety = checkSafety(update, context, username)
+    if not isSafety:
+        return
+    
+    setState(username, StateEnum.redCard)
+
+    fullText = f"""<b>You are about to award someone a red card (2 Safety Breaches)</b>
+
+If you wish to <b>proceed</b>, type in the <b>telegram handle of the offender</b>
+
+If you wish to <b>cancel</b>, type in /cancelCard"""
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     parse_mode = 'HTML')
+
+def handleRedCard(update, context, offenderUsername):
+    print(f"HANDLING RED CARD OF {offenderUsername}")
+    username = update.message.chat.username
+    isSafety = checkSafety(update, context, username)
+    if not isSafety:
+        return
+
+    if offenderUsername == "/cancelCard":
+        setState(username, None)
+        fullText = f"Yellow/Red Card has been cancelled\n\n{dontWasteMyTimeText}"
+        bot.send_message(chat_id = userTracker[username]["chat_id"],
+            text = fullText,
+            parse_mode = 'HTML')
+        return
+
+    valid = validUsername(update, context, offenderUsername)
+    if not valid:
+        return
+
+    userDb = userTracker[username]["db"]
+    currentSafetyBreaches = userDb.getPlayerSafetyBreaches(offenderUsername, currentGame.currentRound)
+    currentSafetyBreaches += 2
+    userDb.setPlayerSafetyBreaches(offenderUsername, currentGame.currentRound, currentSafetyBreaches)
+
+    fullText = f"""@{offenderUsername} has been given a Red Card, and now has {currentSafetyBreaches} safety breaches!
+
+2 Safety Breaches, and you are out!"""
+    bot.send_message(chat_id = update.message.chat.id,
+        text = fullText,
+        parse_mode = 'HTML')
+    bot.send_message(chat_id = userTracker[offenderUsername]["chat_id"],
+        text = fullText,
+        parse_mode = 'HTML')
+    
+    setState(username, None)
 
 #========================Player Command Handlers===============================================
 # Sends start command and registers new usernames
@@ -1708,6 +1817,12 @@ def mainMessageHandler(update, context):
         case StateEnum.adminBroadcast:
             handleAdminBroadcast(update, context, text)
             return
+        case StateEnum.yellowCard:
+            handleYellowCard(update, context, text)
+            return
+        case StateEnum.redCard:
+            handleRedCard(update, context, text)
+            return
         case _:
             print(f'ERROR IN MSGHANDLER: No such state defined ({currentState})\nText: {text}')
             return
@@ -1756,6 +1871,9 @@ def mainCallBackHandler(update, context):
     if optionID == str(OptionIDEnum.adminAddPoints):
         askAdminAddPoints(update, context, value)
         return
+    if optionID == str(OptionIDEnum.adminBroadcast):
+        pumpAdminBroadcast(update, context, value)
+        return
     else:
         print(f'ERROR IN CALLBACKHANDLER: No such optionID defined ({optionID})\nValue: {value}')
         return
@@ -1797,7 +1915,7 @@ def checkPlayPhase(update, context, callback=False):
     return True
 
 #=========================Authentication helpers=======================
-def checkAdmin(update, context, username):
+def checkSafety(update, context, username):
     if username in admins:
         return True
     
@@ -1944,6 +2062,10 @@ def main():
     dp.add_handler(CommandHandler("giveStick", giveStickCmd))
     dp.add_handler(CommandHandler("checkStick", checkStickCmd))
     dp.add_handler(CommandHandler("elimination", eliminationCmd))
+
+    # Safety commands
+    dp.add_handler(CommandHandler("yellowCard", yellowCardCmd))
+    dp.add_handler(CommandHandler("redCard", redCardCmd))
 
     # Handle all messages
     dp.add_handler(MessageHandler(callback=mainMessageHandler, filters=Filters.all))
