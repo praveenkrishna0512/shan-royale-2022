@@ -49,6 +49,7 @@ bot = telebot.TeleBot(API_KEY, parse_mode = None)
 roundList = [1, 2]
 yesNoList = ["Yes", "No"]
 
+# TODO: LOAD UPON RESUME
 currentGame = Game(roundList[0])
 factionsMap = {
     "1": "Sparta",
@@ -61,6 +62,7 @@ admins = ["praveeeenk", "Casperplz"]
 gameMasters = ["praveeeenk", "Casperplz", "ddannyiel", "Jobeet", "kelsykoh", "keziakhoo", "vigonometry"]
 safetyOfficers = ["praveeeenk", "Casperplz", "ddannyiel", "Jobeet", "kelsykoh", "keziakhoo", "vigonometry"]
 
+# TODO: LOAD UPON RESUME
 adminQuery = {}
 
 minPoints = 5
@@ -113,6 +115,7 @@ class OptionIDEnum(enum.Enum):
 # Handles state of the bot for each user
 # Key: username
 # Value: dynamic dictionary
+# TODO: LOAD UPON RESUME
 userTracker = {}
 
 def setState(username, state):
@@ -659,7 +662,7 @@ Please contact @praveeeenk if the problem persists."""
     print("User Tracker: " + str(userTracker))
 
 def helpCmd(update, context):
-    playerCmds = """Here are the suppported player commands:\n
+    playerCmds = """<b>Here are the suppported player commands:</b>\n
 <b>/start</b> - Register yourself and start playing!
 <b>/help</b> - List all available commands
 <b>/faction</b> - See details about your faction
@@ -672,7 +675,7 @@ def helpCmd(update, context):
 <b>/visitspystation</b> - Record your visit to the spy station
 """
 
-    gamemasterCmds = """Here are the suppported game master commands:\n
+    gamemasterCmds = """<b>Here are the suppported game master commands:</b>\n
 <b>/tier1a</b> - Get Tier 1a information
 <b>/tier1b</b> - Get Tier 1b information
 <b>/tier2a</b> - Get Tier 2a information
@@ -684,12 +687,12 @@ def helpCmd(update, context):
 <b>/elimination</b> - Eliminate a player upon request
 """
 
-    safetyCmds = """Here are the suppported safety officer commands:\n
+    safetyCmds = """<b>Here are the suppported safety officer commands:</b>\n
 <b>/yellowcard</b> - Give a player a yellow card
 <b>/redcard</b> - Give a player a red card
 """
 
-    adminCmds = """Here are the supported admin commands:
+    adminCmds = """<b>Here are the supported admin commands:</b>\n
 <b>/adminbeginround</b> - Begin the Set Points phase for a round
 <b>/adminendsetpoints</b> - End the Set Points phase and begin Killing phase for the current round
 <b>/adminendround</b> - End the Round despite the phase
