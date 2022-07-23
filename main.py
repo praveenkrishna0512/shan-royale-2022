@@ -72,6 +72,8 @@ tier1bTopCut = 1
 tier2bNumToSelect = 10
 tier2bTopCut = 1
 tier3bNumToSelect = 3
+maxStickPerRound = 10
+stickExpiryInSecs = 600
 
 #=============================Texts==========================================
 dontWasteMyTimeText = """\"<b>Don't waste my time...</b> You aren't allowed to use this command now.\"
@@ -82,6 +84,7 @@ dontWasteMyTimeText = """\"<b>Don't waste my time...</b> You aren't allowed to u
 class StateEnum(enum.Enum):
     setPoints = "setPoints"
     kill = "kill"
+    giveStick = "giveStick"
 
 class OptionIDEnum(enum.Enum):
     beginRound = "beginRound"
@@ -1236,6 +1239,101 @@ def handleTier3b(update, context, faction):
                      message_id = update.callback_query.message.message_id,
                      parse_mode = 'HTML')
 
+def giveStickCmd(update, context):
+    killingPhase = checkKillingPhase(update, context)
+    if not killingPhase:
+        return
+    username = update.message.chat.username
+    gameMaster = checkGameMaster(update, context, username)
+    if not gameMaster:
+        return
+    canGive = canGiveStick(update, context)
+    if not canGive:
+        return
+
+    setState(username, StateEnum.giveStick)
+
+    fullText = f"""/giveStick should only be entered when the player has <b>completed their required task at the spy station.</b>
+
+If you wish to <b>proceed</b>, type in the <b>telegram handle of the victim</b>
+
+If you wish to <b>cancel</b>, type in /cancelGiveStick"""
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     parse_mode = 'HTML')
+
+def handleGiveStick(update, context, giveStickUsername):
+    print(f"HANDLING GIVE STICK OF {giveStickUsername}")
+    username = update.message.chat.username
+    killingPhase = checkKillingPhase(update, context)
+    if not killingPhase:
+        setState(username, None)
+        return
+    safe = checkSafetyBreaches(update, context)
+    if not safe:
+        return
+
+    if giveStickUsername == "/cancelGiveStick":
+        setState(username, None)
+        fullText = f"Give Stick has been cancelled\n\n{dontWasteMyTimeText}"
+        bot.send_message(chat_id = userTracker[username]["chat_id"],
+            text = fullText,
+            parse_mode = 'HTML')
+        return
+
+    valid = validUsername(update, context, giveStickUsername)
+    if not valid:
+        return
+
+    canGive = canGiveStick(update, context)
+    if not canGive:
+        setState(username, None)
+        return
+
+    addStick(giveStickUsername)
+    fullText = f"""<b>Stick has been given to {giveStickUsername}</b>! It will expire in about <b>{stickExpiryInSecs}s</b>.
+
+Sticks given in Round 1: {currentGame.stickRound1}
+Sticks given in Round 2: {currentGame.stickRound2}"""
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     parse_mode = 'HTML')
+    setState(username, None)
+
+def canGiveStick(update, context):
+    cannotGiveText = f"""You may not give sticks as the round's stick count has been maxed out!\n\n{dontWasteMyTimeText}"""
+    currentStick = getStick()
+    if currentStick == None:
+        print("ERR: Current Stick is None.")
+        return
+    
+    canGive = currentStick < maxStickPerRound
+    if not canGive:
+        bot.send_message(chat_id = update.message.chat.id,
+                    text = cannotGiveText,
+                    parse_mode = 'HTML')
+        return False
+    return True
+
+def checkStickCmd(update, context):
+    killingPhase = checkKillingPhase(update, context)
+    if not killingPhase:
+        return
+    username = update.message.chat.username
+    gameMaster = checkGameMaster(update, context, username)
+    if not gameMaster:
+        return
+    canGive = canGiveStick(update, context)
+    if not canGive:
+        return
+
+    fullText = f"""Sticks left for:
+Round 1 - {currentGame.stickRound1}
+Round 2 - {currentGame.stickRound2}"""
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     parse_mode = 'HTML')
+
 #===================Message and Callback Handlers==============================
 def mainMessageHandler(update, context):
     username = update.message.chat.username
@@ -1247,6 +1345,9 @@ def mainMessageHandler(update, context):
             return
         case StateEnum.kill:
             handleKill(update, context, text)
+            return
+        case StateEnum.giveStick:
+            handleGiveStick(update, context, text)
             return
         case _:
             print(f'ERROR IN MSGHANDLER: No such state defined ({currentState})\nText: {text}')
@@ -1401,6 +1502,29 @@ def getPlayerSafetyBreaches(username):
         cumulativeSafetyBreach += roundSafetyBreach
     return cumulativeSafetyBreach
 
+def getStick():
+    if currentGame.currentRound == str(1):
+        return currentGame.stickRound1
+    if currentGame.currentRound == str(2):
+        return currentGame.stickRound2
+    print(f"Round {currentGame.currentRound} does not exist!")
+
+def addStick(username):
+    if currentGame.currentRound != str(1) and  currentGame.currentRound != str(2):
+        print(f"Round {currentGame.currentRound} does not exist!")
+        return
+    if currentGame.currentRound == str(1):
+        currentGame.stickRound1 += 1
+    if currentGame.currentRound == str(2):
+        currentGame.stickRound2 += 1
+    
+    userDb = userTracker[username]["db"]
+    userStickExpiry = time.time() + stickExpiryInSecs
+    print(userStickExpiry)
+    userDb.setStickExpiry(username, currentGame.currentRound, userStickExpiry)
+
+    print(f"Added Stick, Game State:\n{currentGame.toString()}")
+
 #====================Other helpers=========================
 def blastMessageToAll(text):
     for user in userTracker.values():
@@ -1449,6 +1573,8 @@ def main():
     dp.add_handler(CommandHandler("tier2b", tier2bCmd))
     dp.add_handler(CommandHandler("tier3a", tier3aCmd))
     dp.add_handler(CommandHandler("tier3b", tier3bCmd))
+    dp.add_handler(CommandHandler("giveStick", giveStickCmd))
+    dp.add_handler(CommandHandler("checkStick", checkStickCmd))
 
     # Handle all messages
     dp.add_handler(MessageHandler(callback=mainMessageHandler, filters=Filters.all))
