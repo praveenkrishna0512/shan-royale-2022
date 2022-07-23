@@ -1033,7 +1033,7 @@ def handleTier2a(update, context, faction):
     userDb = userTracker[username]["db"]
     predatorFaction = userDb.getPredatorFaction(faction, currentGame.currentRound)
 
-    gameMasterText = f"""<b>{factionsMap[predatorFaction]} (ID: {predatorFaction})</b> is the predator faction of {factionsMap[faction]}!
+    gameMasterText = f"""<b>{factionsMap[str(predatorFaction)]} (ID: {predatorFaction})</b> is the predator faction of {factionsMap[str(faction)]}!
 
 ~ Shan Royale 2022 Team"""
     bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
@@ -1250,7 +1250,7 @@ def main():
     # Game Master commands - spystation
     dp.add_handler(CommandHandler("tier1a", tier1aCmd))
     dp.add_handler(CommandHandler("tier1b", tier1bCmd))
-    # dp.add_handler(CommandHandler("tier2a", tier2aCmd))
+    dp.add_handler(CommandHandler("tier2a", tier2aCmd))
     # dp.add_handler(CommandHandler("tier2b", tier2bCmd))
     # dp.add_handler(CommandHandler("tier3a", tier3aCmd))
     # dp.add_handler(CommandHandler("tier3b", tier3bCmd))
