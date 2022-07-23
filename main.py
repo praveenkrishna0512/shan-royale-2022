@@ -66,8 +66,11 @@ highestAllowedSafetyBreach = 2
 immuneSecondsUponDeath = 90
 wrongKillPenalty = 50
 
-#TODO: Change to 5, INFORM CASPER IF NEED BE SHORTER
+#TODO: ASK CASPER IF OKAY, INFORM CASPER IF NEED BE SHORTER
+tier1bNumToSelect = 2
 tier1bTopCut = 1
+tier2bNumToSelect = 10
+tier2bTopCut = 1
 
 #=============================Texts==========================================
 dontWasteMyTimeText = """\"<b>Don't waste my time...</b> You aren't allowed to use this command now.\"
@@ -919,7 +922,7 @@ def handleTier1a(update, context, faction):
     random_num = random.randint(0, len(factionsMap) - 1 - 2)
     selectedFaction = nonPredatorFactions[int(random_num)]
 
-    gameMasterText = f"""Faction {factionsMap[selectedFaction]} (ID: {selectedFaction}) is not the predator faction of Faction {factionsMap[faction]}!
+    gameMasterText = f"""{factionsMap[selectedFaction]} (ID: {selectedFaction}) is <b>not</b> the predator faction of {factionsMap[faction]}!
 
 ~ Shan Royale 2022 Team"""
     bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
@@ -963,28 +966,80 @@ def handleTier1b(update, context, faction):
     sortedArr = sorted(preyMemberPointsMap.items(), key=lambda memberPoints: memberPoints[1], reverse=True)
     print(f"Tier 1b Prey Faction Arr: {sortedArr}")
     
+    numPreyLeft = len(sortedArr) - tier1bTopCut
+    if numPreyLeft <= 0:
+        print("ERROR: TOO LITTLE PREY LEFT ")
+        return
+
+    if numPreyLeft > tier1bNumToSelect:
+        numPreyToSelect = tier1bNumToSelect
+    else:
+        numPreyToSelect = numPreyLeft
+    
     # RAndom num avoids top ppl specified by tier1bTopCut
-    random_num1 = random.randint(tier1bTopCut, len(sortedArr) - 1)
-    random_num2 = random.randint(tier1bTopCut, len(sortedArr) - 1)
-    #TODO: If only one user is present, this results in a loop
-    while random_num1 == random_num2:
-        random_num2 = random.randint(tier1bTopCut, len(sortedArr) - 1)
-    selectedPrey1Tuple = sortedArr[random_num1]
-    selectedPrey2Tuple = sortedArr[random_num2]
-    print(selectedPrey1Tuple)
-    print(selectedPrey2Tuple)
+    #TODO: If num left < tier1bTopCut, this results in a loop
+    randomNumArray = []
+    for i in range(numPreyToSelect):
+        random_num = random.randint(tier1bTopCut, numPreyToSelect)
+        while random_num in randomNumArray:
+            random_num = random.randint(tier1bTopCut, numPreyToSelect)
+        randomNumArray.append(random_num)
+    print(randomNumArray)
 
-    gameMasterText = f"""Here are the details of 2 people from the prey faction of {factionsMap[faction]}, who <b>do not</b> possess the most number of points.
+    pointsTxt = ""
+    for preyIndex in randomNumArray:
+        selectedPreyTuple = sortedArr[preyIndex]
+        pointsTxt += f"@{selectedPreyTuple[0]} - {selectedPreyTuple[1]}pts\n"
 
-@{selectedPrey1Tuple[0]} - {selectedPrey1Tuple[1]}pts
-@{selectedPrey2Tuple[0]} - {selectedPrey2Tuple[1]}pts
+    gameMasterText = f"""Here are the details of <b>{numPreyToSelect}</b> people from the prey faction of {factionsMap[faction]}, who <b>do not</b> possess the most number of points.
 
+{pointsTxt}
 ~ Shan Royale 2022 Team"""
     bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
                      text = gameMasterText,
                      message_id = update.callback_query.message.message_id,
                      parse_mode = 'HTML')
 
+def tier2aCmd(update, context):
+    killingPhase = checkKillingPhase(update, context)
+    if not killingPhase:
+        return
+    username = update.message.chat.username
+    gameMaster = checkGameMaster(update, context, username)
+    if not gameMaster:
+        return
+    
+    fullText = f"""You are querying for <b>the predator faction</b> of the requested faction
+    
+Please state the <b>ID of the faction</b> you are querying for.
+
+<b>Faction Legend:</b>"""
+    for id, name in factionsMap.items():
+        fullText += f"\nID {id}: {name}"
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     reply_markup = makeInlineKeyboard(factionsMap.keys(), OptionIDEnum.tier2a),
+                     parse_mode = 'HTML')
+
+def handleTier2a(update, context, faction):
+    killingPhase = checkKillingPhase(update, context, callback=True)
+    if not killingPhase:
+        return
+    username = update.callback_query.message.chat.username
+    gameMaster = checkGameMaster(update, context, username)
+    if not gameMaster:
+        return
+
+    userDb = userTracker[username]["db"]
+    predatorFaction = userDb.getPredatorFaction(faction, currentGame.currentRound)
+
+    gameMasterText = f"""<b>{factionsMap[predatorFaction]} (ID: {predatorFaction})</b> is the predator faction of {factionsMap[faction]}!
+
+~ Shan Royale 2022 Team"""
+    bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
+                     text = gameMasterText,
+                     message_id = update.callback_query.message.message_id,
+                     parse_mode = 'HTML')
 
 #===================Message and Callback Handlers==============================
 def mainMessageHandler(update, context):
@@ -1028,9 +1083,9 @@ def mainCallBackHandler(update, context):
     if optionID == str(OptionIDEnum.tier1b):
         handleTier1b(update, context, value)
         return
-    # if optionID == str(OptionIDEnum.tier2a):
-    #     handleTier2a(update, context, value)
-    #     return
+    if optionID == str(OptionIDEnum.tier2a):
+        handleTier2a(update, context, value)
+        return
     # if optionID == str(OptionIDEnum.tier2b):
     #     handleTier2b(update, context, value)
     #     return
