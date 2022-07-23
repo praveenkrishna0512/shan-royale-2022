@@ -85,6 +85,7 @@ class StateEnum(enum.Enum):
     setPoints = "setPoints"
     kill = "kill"
     giveStick = "giveStick"
+    elimination = "elimination"
 
 class OptionIDEnum(enum.Enum):
     beginRound = "beginRound"
@@ -98,6 +99,7 @@ class OptionIDEnum(enum.Enum):
     tier2b = "tier2b"
     tier3a = "tier3a"
     tier3b = "tier3b"
+    eliminationAskFaction = "eliminationAskFaction"
 
 # Handles state of the bot for each user
 # Key: username
@@ -311,28 +313,32 @@ Please contact @praveeeenk if the problem persists."""
         newUserTracker = {
             "state": None,
             "db": db,
-            "chat_id": update.message.chat.id
+            "chat_id": update.message.chat.id,
+            "elimination_target": ""
         }
         userTracker[username] = newUserTracker
         #TODO: REMOVE!!
         vigTracker = {
             'state': None,
             'db': DBHelper(),
-            'chat_id': "258884638"
+            'chat_id': "258884638",
+            "elimination_target": ""
         }
         userTracker["vigonometry"] = vigTracker
         #TODO: REMOVE!!
         danTracker = {
             'state': None,
             'db': DBHelper(),
-            'chat_id': "258884638"
+            'chat_id': "258884638",
+            "elimination_target": ""
         }
         userTracker["ddannyiel"] = danTracker
         #TODO: REMOVE!!
         casperTracker = {
             'state': None,
             'db': DBHelper(),
-            'chat_id': "355739375"
+            'chat_id': "355739375",
+            "elimination_target": ""
         }
         userTracker["Casperplz"] = casperTracker
 
@@ -1334,6 +1340,145 @@ Round 2 - {currentGame.stickRound2}"""
                      text = fullText,
                      parse_mode = 'HTML')
 
+def eliminationCmd(update, context):
+    killingPhase = checkKillingPhase(update, context)
+    if not killingPhase:
+        return
+    username = update.message.chat.username
+    gameMaster = checkGameMaster(update, context, username)
+    if not gameMaster:
+        return
+
+    setState(username, StateEnum.elimination)
+
+    fullText = f"""/elimination should only be entered when a player has <b>turned in the "death note"</b> at the spy station.
+
+If you wish to <b>proceed</b>, type in the <b>telegram handle of the victim</b>, as requested by the player.
+
+If you wish to <b>cancel</b>, type in /cancelElimination"""
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     parse_mode = 'HTML')
+
+def eliminationAskFaction(update, context, victimUsername):
+    killingPhase = checkKillingPhase(update, context)
+    if not killingPhase:
+        return
+    username = update.message.chat.username
+    gameMaster = checkGameMaster(update, context, username)
+    if not gameMaster:
+        return
+
+    if victimUsername == "/cancelElimination":
+        setState(username, None)
+        fullText = f"Elimination has been cancelled\n\n{dontWasteMyTimeText}"
+        bot.send_message(chat_id = userTracker[username]["chat_id"],
+            text = fullText,
+            parse_mode = 'HTML')
+        return
+
+    valid = validUsername(update, context, victimUsername)
+    if not valid:
+        return
+
+    # Store victimUsername
+    userTracker[username]["elimination_target"] = victimUsername
+
+    fullText = f"""Please state the <b>ID of the faction</b> of the player requesting the elimination.
+
+<b>Faction Legend:</b>"""
+    for id, name in factionsMap.items():
+        fullText += f"\nID {id}: {name}"
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     reply_markup = makeInlineKeyboard(factionsMap.keys(), OptionIDEnum.eliminationAskFaction),
+                     parse_mode = 'HTML')
+
+def handleElimination(update, context, killerFaction):
+    username = update.callback_query.message.chat.username
+    victimUsername = userTracker[username]["elimination_target"]
+    if victimUsername == "":
+        print(f"Victim Username is empty string! Request by {username}")
+        return
+
+    print(f"HANDLING ELIMINATION OF {victimUsername}")
+    killingPhase = checkKillingPhase(update, context, callback=True)
+    if not killingPhase:
+        setState(username, None)
+        return
+    safe = checkSafetyBreaches(update, context, callback=True)
+    if not safe:
+        setState(username, None)
+        return
+
+    if victimUsername == "/cancelElimination":
+        setState(username, None)
+        fullText = f"Kill has been cancelled\n\n{dontWasteMyTimeText}"
+        bot.send_message(chat_id = userTracker[username]["chat_id"],
+            text = fullText,
+            parse_mode = 'HTML')
+        return
+
+    eliminationKill(update, context, killerFaction, victimUsername)
+    
+    userTracker[username]["elimination_target"] = ""
+    setState(username, None)
+
+def eliminationKill(update, context, killerFaction, victimUsername):
+    username = update.callback_query.message.chat.username
+    userDb = userTracker[username]["db"]
+    victimData = userDb.getPlayerDataJSON(victimUsername, currentGame.currentRound)
+
+    victimFaction = victimData[playerDataKeys.faction]
+    killerFactionData = userDb.getFactionDataJSON(killerFaction)
+    
+    # Update faction data
+    pointsToAdd = victimData[playerDataKeys.points]
+    killerFactionData[factionDataKeys.bank] += pointsToAdd
+    userDb.replaceFactionDataFromJSON(killerFactionData)
+
+    # Update victim data
+    victimData[playerDataKeys.points] = 5
+    victimData[playerDataKeys.deathCount] += 1
+    userDb.replacePlayerDataFromJSON(victimData, currentGame.currentRound)
+
+    # Update killer data - NOT FOR ELIMINATION
+    # killerData[playerDataKeys.killCount] += 1
+    # userDb.replacePlayerDataFromJSON(killerData, currentGame.currentRound)
+
+    # Blast message to killer's faction
+    killerFactionText = f"""<b>{factionsMap[str(killerFaction)]} Faction Update</b>
+
+{victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}) has been <b>eliminated</b> by one of your faction members!!
+
+Points added to faction bank: <b>{pointsToAdd}pts</b>
+Current faction bank balance: <b>{killerFactionData[factionDataKeys.bank]}pts</b>."""
+    killerFactionMembers = userDb.getFactionMemberUsernames(killerFaction, currentGame.currentRound)
+    for username in killerFactionMembers:
+        if username not in userTracker.keys():
+            continue
+        chat_id = userTracker[username]["chat_id"]
+        bot.send_message(chat_id = chat_id,
+            text = killerFactionText,
+            parse_mode = 'HTML')
+
+    # Blast message to victim's faction
+    victimFactionText = f"""<b>{factionsMap[str(victimFaction)]} Faction Update</b>
+
+{victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}) has been <b>eliminated</b> by {factionsMap[str(killerFaction)]} Faction!
+
+Their points have been <b>reset to {minPoints}</b>.
+
+<b>Note:</b> The victim, {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}), is <b>NOT immune from subsequent kills</b>."""
+    victimFactionMembers = userDb.getFactionMemberUsernames(victimFaction, currentGame.currentRound)
+    for username in victimFactionMembers:
+        if username not in userTracker.keys():
+            continue
+        chat_id = userTracker[username]["chat_id"]
+        bot.send_message(chat_id = chat_id,
+            text = victimFactionText,
+            parse_mode = 'HTML')
+
 #===================Message and Callback Handlers==============================
 def mainMessageHandler(update, context):
     username = update.message.chat.username
@@ -1348,6 +1493,9 @@ def mainMessageHandler(update, context):
             return
         case StateEnum.giveStick:
             handleGiveStick(update, context, text)
+            return
+        case StateEnum.elimination:
+            eliminationAskFaction(update, context, text)
             return
         case _:
             print(f'ERROR IN MSGHANDLER: No such state defined ({currentState})\nText: {text}')
@@ -1390,6 +1538,9 @@ def mainCallBackHandler(update, context):
         return
     if optionID == str(OptionIDEnum.tier3b):
         handleTier3b(update, context, value)
+        return
+    if optionID == str(OptionIDEnum.eliminationAskFaction):
+        handleElimination(update, context, value)
         return
     else:
         print(f'ERROR IN CALLBACKHANDLER: No such optionID defined ({optionID})\nValue: {value}')
@@ -1575,6 +1726,7 @@ def main():
     dp.add_handler(CommandHandler("tier3b", tier3bCmd))
     dp.add_handler(CommandHandler("giveStick", giveStickCmd))
     dp.add_handler(CommandHandler("checkStick", checkStickCmd))
+    dp.add_handler(CommandHandler("elimination", eliminationCmd))
 
     # Handle all messages
     dp.add_handler(MessageHandler(callback=mainMessageHandler, filters=Filters.all))
