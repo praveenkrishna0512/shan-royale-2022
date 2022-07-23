@@ -1,5 +1,6 @@
 from calendar import weekday
 from datetime import datetime, timezone
+from email import message
 import enum
 import json
 import logging
@@ -60,6 +61,8 @@ admins = ["praveeeenk", "Casperplz"]
 gameMasters = ["praveeeenk", "Casperplz"]
 safetyOfficers = ["praveeeenk", "Casperplz"]
 
+adminQuery = {}
+
 minPoints = 5
 maxTeamPoints = 200
 highestAllowedSafetyBreach = 2
@@ -86,6 +89,7 @@ class StateEnum(enum.Enum):
     kill = "kill"
     giveStick = "giveStick"
     elimination = "elimination"
+    adminAddPoints = "adminAddPoints"
 
 class OptionIDEnum(enum.Enum):
     beginRound = "beginRound"
@@ -100,6 +104,7 @@ class OptionIDEnum(enum.Enum):
     tier3a = "tier3a"
     tier3b = "tier3b"
     eliminationAskFaction = "eliminationAskFaction"
+    adminAddPoints = "adminAddPoints"
 
 # Handles state of the bot for each user
 # Key: username
@@ -289,6 +294,10 @@ If there are no more round, hope you enjoyed the game and please gather at your 
 # TODO: Showing player text is too long, figure out if Casper needs it
 def adminFactionDetails(update, context):
     username = update.message.chat.username
+    isAdmin = checkAdmin(update, context, username)
+    if not isAdmin:
+        return
+
     userDb = userTracker[username]["db"]
     summaryText = "<b>Factions Summary</b>"
     bankText = "\n\n<b>Banks</b>"
@@ -331,6 +340,84 @@ def adminFactionDetails(update, context):
         text = summaryText,
         parse_mode = 'HTML')
 
+def adminAddPoints(update, context):
+    username = update.message.chat.username
+    isAdmin = checkAdmin(update, context, username)
+    if not isAdmin:
+        return
+    fullText = f"""You are about to <b>add points</b> for a faction
+    
+Please press the <b>ID of the faction</b> you are querying for.
+
+<b>Faction Legend:</b>"""
+    for id, name in factionsMap.items():
+        fullText += f"\nID {id}: {name}"
+    fullText += f"\n\n Note: If pressed wrongly, just add 0 points bodoh."
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     reply_markup = makeInlineKeyboard(factionsMap.keys(), OptionIDEnum.adminAddPoints),
+                     parse_mode = 'HTML')
+    return
+
+def askAdminAddPoints(update, context, faction):
+    username = update.callback_query.message.chat.username
+    isAdmin = checkAdmin(update, context, username)
+    if not isAdmin:
+        return
+
+    # Store faction data
+    adminQuery[username] = {
+        OptionIDEnum.adminAddPoints: faction
+    }
+
+    setState(username, StateEnum.adminAddPoints)
+
+    fullText = f"""Please state the <b>number of points to add</b> for {factionsMap[str(faction)]} (ID: {faction})
+
+~ Shan Royale 2022 Team"""
+    bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
+                     text = fullText,
+                     message_id = update.callback_query.message.message_id,
+                     parse_mode = 'HTML')
+
+def handleAdminAddPoints(update, context, points):
+    username = update.message.chat.username
+    chat_id = update.message.chat.id
+    isAdmin = checkAdmin(update, context, username)
+    if not isAdmin:
+        return
+
+    try:
+        points = int(points)
+    except:
+        txt = "<b>Wrong Input! Please type in an integer value only!</b>"
+        bot.send_message(chat_id = chat_id,
+            text = txt,
+            parse_mode = 'HTML')
+        return
+
+    faction = adminQuery[username][OptionIDEnum.adminAddPoints]
+    if faction not in factionsMap.keys():
+        txt = f"<b>Faction specified is wrong!! (Value: {faction})</b>. Try /adminAddPoints again."
+        bot.send_message(chat_id = chat_id,
+            text = txt,
+            parse_mode = 'HTML')
+        return
+
+    userDb = userTracker[username]["db"]
+    factionBankBalance = userDb.getBank(faction)
+    factionBankBalance += points
+    userDb.setBank(factionBankBalance, faction)
+
+    fullText = f"""Due to the good will of the game admin, <b>{factionsMap[str(faction)]} Faction has received {points}pts!</b>
+
+Current bank balance: {factionBankBalance}
+
+~ Shan Royale 2022 Team"""
+    blastMessageToAll(fullText)
+
+    adminQuery[username][OptionIDEnum.adminAddPoints] = ""
+    setState(username, None)
 
 #========================Player Command Handlers===============================================
 # Sends start command and registers new usernames
@@ -1544,6 +1631,9 @@ def mainMessageHandler(update, context):
         case StateEnum.elimination:
             eliminationAskFaction(update, context, text)
             return
+        case StateEnum.adminAddPoints:
+            handleAdminAddPoints(update, context, text)
+            return
         case _:
             print(f'ERROR IN MSGHANDLER: No such state defined ({currentState})\nText: {text}')
             return
@@ -1588,6 +1678,9 @@ def mainCallBackHandler(update, context):
         return
     if optionID == str(OptionIDEnum.eliminationAskFaction):
         handleElimination(update, context, value)
+        return
+    if optionID == str(OptionIDEnum.adminAddPoints):
+        askAdminAddPoints(update, context, value)
         return
     else:
         print(f'ERROR IN CALLBACKHANDLER: No such optionID defined ({optionID})\nValue: {value}')
@@ -1746,6 +1839,7 @@ def main():
     dp.add_handler(CommandHandler("adminEndSetPoints", adminEndSetPointsCmd))
     dp.add_handler(CommandHandler("adminEndRound", adminEndRoundCmd))
     dp.add_handler(CommandHandler("adminFactionDetails", adminFactionDetails))
+    dp.add_handler(CommandHandler("adminAddPoints", adminAddPoints))
 
     # Player commands - general
     dp.add_handler(CommandHandler("start", startCmd))
