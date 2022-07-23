@@ -285,6 +285,53 @@ If not, wait for the admin to begin another round!
 If there are no more round, hope you enjoyed the game and please gather at your next location!"""
     blastMessageToAll(blastText)
 
+# TODO: SORT ALL VALUES
+# TODO: Showing player text is too long, figure out if Casper needs it
+def adminFactionDetails(update, context):
+    username = update.message.chat.username
+    userDb = userTracker[username]["db"]
+    summaryText = "<b>Factions Summary</b>"
+    bankText = "\n\n<b>Banks</b>"
+    totalPointsTxt = "\n\n<b>Points</b>"
+    totalKillsTxt = "\n\n<b>Kills</b>"
+    totalDeathsTxt = "\n\n<b>Deaths</b>"
+    playerText = "\n\n"
+    for playerFaction in factionsMap.keys():
+        factionBank = userDb.getBank(playerFaction)
+        factionMembersPointsMap = userDb.getFactionMemberPoints(playerFaction, currentGame.currentRound)
+        factionKDArrMap = userDb.getFactionMemberKD(playerFaction, currentGame.currentRound)
+
+        totalPoints = 0
+        totalKills = 0
+        totalDeaths = 0
+
+        header = f"""---------------------------------------
+<b>{factionsMap[str(playerFaction)]} Faction Individual Stats (ID: {playerFaction})</b>"""
+        pointsTxt = "\n\n<b>Current Points:</b>"
+        killCountTxt = "\n\n<b>Kill Count:</b>"
+        deathCountTxt = "\n\n<b>Death Count:</b>"
+        for username, points in factionMembersPointsMap.items():
+            totalPoints += points
+            pointsTxt += f"\n@{username}: {points}pts"
+        for username, KDArr in factionKDArrMap.items():
+            totalKills += KDArr[0]
+            totalDeaths += KDArr[1]
+            killCountTxt += f"\n@{username}: {KDArr[0]}"
+            deathCountTxt += f"\n@{username}: {KDArr[1]}"
+        
+        bankText += f"\n- {factionsMap[str(playerFaction)]}: {factionBank}"
+        totalPointsTxt += f"\n- {factionsMap[str(playerFaction)]}: {totalPoints}"
+        totalKillsTxt += f"\n- {factionsMap[str(playerFaction)]}: {totalKills}"
+        totalDeathsTxt += f"\n- {factionsMap[str(playerFaction)]}: {totalDeaths}"
+        playerText += header + pointsTxt + killCountTxt + deathCountTxt + """
+-------END OF FACTION'S INDIV PLAYER DEETS-------\n\n"""
+
+    summaryText += bankText + totalPointsTxt + totalKillsTxt + totalDeathsTxt
+    bot.send_message(chat_id = update.message.chat.id,
+        text = summaryText,
+        parse_mode = 'HTML')
+
+
 #========================Player Command Handlers===============================================
 # Sends start command and registers new usernames
 def startCmd(update, context):
@@ -375,7 +422,7 @@ def factionCmd(update, context):
     factionMembersPointsMap = userDb.getFactionMemberPoints(playerFaction, currentGame.currentRound)
     factionKDArrMap = userDb.getFactionMemberKD(playerFaction, currentGame.currentRound)
 
-    header = f"<b>Faction {factionsMap[str(playerFaction)]} Stats (id: {playerFaction})</b>"
+    header = f"<b>{factionsMap[str(playerFaction)]} Faction Stats (id: {playerFaction})</b>"
     bankTxt = f"\n\n<b>Bank:</b> {factionBank}"
     pointsTxt = "\n\n<b>Current Points:</b>"
     killCountTxt = "\n\n<b>Kill Count:</b>"
@@ -477,7 +524,7 @@ def listPointsCmd(update, context):
     playerFaction = userDb.getPlayerFaction(username, currentGame.currentRound)
     factionMembersPointsMap = userDb.getFactionMemberPoints(playerFaction, currentGame.currentRound)
 
-    txt1 = "Here are the current updated points held by your faction members\n"
+    txt1 = f"Here are the current updated points held by your {factionsMap[str(playerFaction)]} faction members\n"
     txt2 = ""
     for username, points in factionMembersPointsMap.items():
         txt2 += f"\n@{username}: {points}pts"
@@ -1698,6 +1745,7 @@ def main():
     dp.add_handler(CommandHandler("adminBeginRound", adminBeginRoundCmd))
     dp.add_handler(CommandHandler("adminEndSetPoints", adminEndSetPointsCmd))
     dp.add_handler(CommandHandler("adminEndRound", adminEndRoundCmd))
+    dp.add_handler(CommandHandler("adminFactionDetails", adminFactionDetails))
 
     # Player commands - general
     dp.add_handler(CommandHandler("start", startCmd))
