@@ -10,7 +10,7 @@ from sqlite3 import Time
 from tabnanny import check
 import time
 from tracemalloc import BaseFilter
-from numpy import full
+from numpy import broadcast, full
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 from env import get_api_key, get_port
 from telebot import types, telebot
@@ -90,6 +90,7 @@ class StateEnum(enum.Enum):
     giveStick = "giveStick"
     elimination = "elimination"
     adminAddPoints = "adminAddPoints"
+    adminBroadcast = "adminBroadcast"
 
 class OptionIDEnum(enum.Enum):
     beginRound = "beginRound"
@@ -105,6 +106,7 @@ class OptionIDEnum(enum.Enum):
     tier3b = "tier3b"
     eliminationAskFaction = "eliminationAskFaction"
     adminAddPoints = "adminAddPoints"
+    adminBroadcast = "adminBroadcast"
 
 # Handles state of the bot for each user
 # Key: username
@@ -418,6 +420,75 @@ Current bank balance: {factionBankBalance}
 
     adminQuery[username][OptionIDEnum.adminAddPoints] = ""
     setState(username, None)
+
+def adminBroadcast(update, context):
+    username = update.message.chat.username
+    isAdmin = checkAdmin(update, context, username)
+    if not isAdmin:
+        return
+    setState(username, StateEnum.adminBroadcast)
+    fullText = f"""Please type in your message!
+    
+To cancel, type in /cancelBroadcast"""
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     parse_mode = 'HTML')
+
+def handleAdminBroadcast(update, context, text):
+    username = update.message.chat.username
+    isAdmin = checkAdmin(update, context, username)
+    if not isAdmin:
+        return
+
+    if text == "/cancelBroadcast":
+        setState(username, None)
+        fullText = f"Broadcast has been cancelled\n\n{dontWasteMyTimeText}"
+        bot.send_message(chat_id = userTracker[username]["chat_id"],
+            text = fullText,
+            parse_mode = 'HTML')
+        return
+
+    # Store faction data
+    adminQuery[username] = {
+        StateEnum.adminBroadcast: text
+    }
+
+    fullText = f"Is this okay sir/maam?\n\n{text}'"
+    bot.send_message(chat_id = update.callback_query.message.chat.id,
+                     text = fullText,
+                     reply_markup = makeInlineKeyboard(yesNoList, OptionIDEnum.adminBroadcast),
+                     parse_mode = 'HTML')
+
+def pumpAdminBroadcast(update, context, yesNo):
+    username = update.callback_query.message.chat.username
+    chat_id =update.callback_query.message.chat.id
+    message_id =update.callback_query.message.message_id
+    isAdmin = checkAdmin(update, context, username)
+    if not isAdmin:
+        return
+
+    if yesNo == yesNoList[1]:
+        # "No" was pressed
+        bot.edit_message_text(chat_id = chat_id,
+                     text = dontWasteMyTimeText,
+                     message_id = message_id,
+                     parse_mode = 'HTML')
+        return
+    # "Yes" was pressed
+    broadcastText = adminQuery[username][StateEnum.adminBroadcast]
+    if broadcastText == "":
+        fullText = "No text was detected. Try /adminBroadcast again."
+        bot.send_message(chat_id = chat_id,
+                     text = fullText,
+                     parse_mode = 'HTML')
+        return
+    
+    blastMessageToAll(broadcastText)
+
+    # Store faction data
+    adminQuery[username][StateEnum.adminBroadcast] = ""
+    setState(username, None)
+    return
 
 #========================Player Command Handlers===============================================
 # Sends start command and registers new usernames
@@ -1634,6 +1705,9 @@ def mainMessageHandler(update, context):
         case StateEnum.adminAddPoints:
             handleAdminAddPoints(update, context, text)
             return
+        case StateEnum.adminBroadcast:
+            handleAdminBroadcast(update, context, text)
+            return
         case _:
             print(f'ERROR IN MSGHANDLER: No such state defined ({currentState})\nText: {text}')
             return
@@ -1840,6 +1914,7 @@ def main():
     dp.add_handler(CommandHandler("adminEndRound", adminEndRoundCmd))
     dp.add_handler(CommandHandler("adminFactionDetails", adminFactionDetails))
     dp.add_handler(CommandHandler("adminAddPoints", adminAddPoints))
+    dp.add_handler(CommandHandler("adminBroadcast", adminBroadcast))
 
     # Player commands - general
     dp.add_handler(CommandHandler("start", startCmd))
