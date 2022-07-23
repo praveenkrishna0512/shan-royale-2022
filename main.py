@@ -66,6 +66,9 @@ highestAllowedSafetyBreach = 2
 immuneSecondsUponDeath = 90
 wrongKillPenalty = 50
 
+#TODO: Change to 5, INFORM CASPER IF NEED BE SHORTER
+tier1bTopCut = 1
+
 #=============================Texts==========================================
 dontWasteMyTimeText = """\"<b>Don't waste my time...</b> You aren't allowed to use this command now.\"
 ~ Message by Caserplz"""
@@ -885,7 +888,7 @@ def tier1aCmd(update, context):
     if not gameMaster:
         return
     
-    fullText = f"""You are querying for 1 Faction that is NOT the predator faction of the requested faction
+    fullText = f"""You are querying for <b>1 Faction that is NOT the predator faction</b> of the requested faction
     
 Please state the <b>ID of the faction</b> you are querying for.
 
@@ -933,7 +936,7 @@ def tier1bCmd(update, context):
     if not gameMaster:
         return
     
-    fullText = f"""You are querying for 2 people from the prey faction of the requested faction, who <b>do not</b> possess the most number of points.
+    fullText = f"""You are querying for <b>2 people from the prey faction</b> of the requested faction, who <b>do not</b> possess the most number of points.
     
 Please state the <b>ID of the faction</b> you are querying for.
 
@@ -942,7 +945,7 @@ Please state the <b>ID of the faction</b> you are querying for.
         fullText += f"\nID {id}: {name}"
     bot.send_message(chat_id = update.message.chat.id,
                      text = fullText,
-                     reply_markup = makeInlineKeyboard(factionsMap.keys(), OptionIDEnum.tier2a),
+                     reply_markup = makeInlineKeyboard(factionsMap.keys(), OptionIDEnum.tier1b),
                      parse_mode = 'HTML')
 
 def handleTier1b(update, context, faction):
@@ -955,23 +958,32 @@ def handleTier1b(update, context, faction):
         return
 
     userDb = userTracker[username]["db"]
-    enemyFaction = userDb.getTargetFactionFromFaction(faction, currentGame.currentRound)
-    nonEnemyFactions = []
-    for factionID in factionsMap.keys():
-        if factionID == str(faction) or factionID == str(enemyFaction):
-            continue
-        nonEnemyFactions.append(factionID)
-    random_num = random.randint(0, len(factionsMap) - 1 - 2)
-    selectedFaction = nonEnemyFactions[int(random_num)]
+    preyFaction = userDb.getTargetFactionFromFaction(faction, currentGame.currentRound)
+    preyMemberPointsMap = userDb.getFactionMemberPoints(preyFaction, currentGame.currentRound)
+    sortedArr = sorted(preyMemberPointsMap.items(), key=lambda memberPoints: memberPoints[1], reverse=True)
+    print(f"Tier 1b Prey Faction Arr: {sortedArr}")
+    
+    # RAndom num avoids top ppl specified by tier1bTopCut
+    random_num1 = random.randint(tier1bTopCut, len(sortedArr) - 1)
+    random_num2 = random.randint(tier1bTopCut, len(sortedArr) - 1)
+    #TODO: If only one user is present, this results in a loop
+    while random_num1 == random_num2:
+        random_num2 = random.randint(tier1bTopCut, len(sortedArr) - 1)
+    selectedPrey1Tuple = sortedArr[random_num1]
+    selectedPrey2Tuple = sortedArr[random_num2]
+    print(selectedPrey1Tuple)
+    print(selectedPrey2Tuple)
 
-    gameMasterText = f"""Faction {factionsMap[selectedFaction]} (ID: {selectedFaction}) is not the prey faction of Faction {factionsMap[faction]}!
+    gameMasterText = f"""Here are the details of 2 people from the prey faction of {factionsMap[faction]}, who <b>do not</b> possess the most number of points.
+
+@{selectedPrey1Tuple[0]} - {selectedPrey1Tuple[1]}pts
+@{selectedPrey2Tuple[0]} - {selectedPrey2Tuple[1]}pts
 
 ~ Shan Royale 2022 Team"""
     bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
                      text = gameMasterText,
                      message_id = update.callback_query.message.message_id,
                      parse_mode = 'HTML')
-
 
 
 #===================Message and Callback Handlers==============================
@@ -1182,6 +1194,11 @@ def main():
 
     # Game Master commands - spystation
     dp.add_handler(CommandHandler("tier1a", tier1aCmd))
+    dp.add_handler(CommandHandler("tier1b", tier1bCmd))
+    # dp.add_handler(CommandHandler("tier2a", tier2aCmd))
+    # dp.add_handler(CommandHandler("tier2b", tier2bCmd))
+    # dp.add_handler(CommandHandler("tier3a", tier3aCmd))
+    # dp.add_handler(CommandHandler("tier3b", tier3bCmd))
 
     # Handle all messages
     dp.add_handler(MessageHandler(callback=mainMessageHandler, filters=Filters.all))
