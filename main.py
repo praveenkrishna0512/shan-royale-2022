@@ -59,7 +59,7 @@ factionsMap = {
 
 admins = ["praveeeenk", "Casperplz"]
 gameMasters = ["praveeeenk", "Casperplz", "ddannyiel", "Jobeet", "kelsykoh", "keziakhoo", "vigonometry"]
-safetyOfficers = ["praveeeenk", "Casperplz", "ddannyiel", "Jobeet"]
+safetyOfficers = ["praveeeenk", "Casperplz", "ddannyiel", "Jobeet", "kelsykoh", "keziakhoo", "vigonometry"]
 
 adminQuery = {}
 
@@ -698,10 +698,28 @@ def helpCmd(update, context):
 <b>/adminbroadcast</b> - Broadcast a message
 """
 
-    username = update.message.chat.username
-    isAdmin = isAdmin
+    fullText = "<b>COMMANDS</b>"
 
-    fullText = playerCmds + adminCmds
+    username = update.message.chat.username
+    isAdmin = checkAdmin(update, context, username)
+    if isAdmin:
+        fullText += "\n\n" + adminCmds + "\n\n" + gamemasterCmds + "\n\n" + safetyCmds + "\n\n" + playerCmds
+        update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
+        return
+    
+    isGamemaster = checkGameMaster(update, context, username)
+    if isGamemaster:
+        fullText += "\n\n" + gamemasterCmds + "\n\n" + safetyCmds + "\n\n" + playerCmds
+        update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
+        return
+    
+    isSafety = checkSafety(update, context, username)
+    if isSafety:
+        fullText += "\n\n" + safetyCmds + "\n\n" + playerCmds
+        update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
+        return
+
+    fullText += "\n\n" + playerCmds
     update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
 
 def error(update, context):
