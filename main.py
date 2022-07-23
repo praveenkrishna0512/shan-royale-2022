@@ -26,7 +26,7 @@ if API_KEY == None:
     raise Exception("Please update API Key")
 
 # Excel to Database
-excelFilePath = "./excel/shanRoyale2022Data1.xlsx"
+excelFilePath = "./excel/shanRoyale2022Data3.xlsx"
 playerDataRound1JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="playerDataRound1").to_json(orient='records'))
 playerDataRound2JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="playerDataRound2").to_json(orient='records'))
 factionDataJSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="factionData").to_json(orient='records'))
@@ -56,9 +56,9 @@ factionsMap = {
     "4": "Nemesis"
 }
 
-admins = ["praveeeenk"]
-gameMasters = ["praveeeenk"]
-safetyOfficers = ["praveeeenk"]
+admins = ["praveeeenk", "Casperplz"]
+gameMasters = ["praveeeenk", "Casperplz"]
+safetyOfficers = ["praveeeenk", "Casperplz"]
 
 minPoints = 5
 maxTeamPoints = 200
@@ -328,7 +328,7 @@ Please contact @praveeeenk if the problem persists."""
         casperTracker = {
             'state': None,
             'db': DBHelper(),
-            'chat_id': "258884638"
+            'chat_id': "355739375"
         }
         userTracker["Casperplz"] = casperTracker
 
@@ -763,6 +763,24 @@ def wrongKill(update, context, killerUsername, victimUsername):
     victimFullname = userDb.getFullname(victimUsername, currentGame.currentRound)
     killerFaction = userDb.getPlayerFaction(killerUsername, currentGame.currentRound)
     victimFaction = userDb.getPlayerFaction(victimUsername, currentGame.currentRound)
+
+    if killerFaction == victimFaction:
+        txt = f"""<b>{factionsMap[str(killerFaction)]} Faction Update</b>
+
+Ummmmmm...
+
+{killerFullname} (@{killerUsername}) tried to <b>wrongly kill</b> their faction mate, {victimFullname} (@{victimUsername})!
+
+Please settle your internal rivalry guys..."""
+        killerFactionMembers = userDb.getFactionMemberUsernames(killerFaction, currentGame.currentRound)
+        for username in killerFactionMembers:
+            if username not in userTracker.keys():
+                continue
+            chat_id = userTracker[username]["chat_id"]
+            bot.send_message(chat_id = chat_id,
+                text = txt,
+                parse_mode = 'HTML')
+        return
     
     # Update faction banks
     killerBankBalance = userDb.getBank(killerFaction)
@@ -939,7 +957,7 @@ def tier1bCmd(update, context):
     if not gameMaster:
         return
     
-    fullText = f"""You are querying for <b>2 people from the prey faction</b> of the requested faction, who <b>do not</b> possess the most number of points.
+    fullText = f"""You are querying for <b>{tier1bNumToSelect} people from the prey faction</b> of the requested faction, who <b>do not</b> possess the most number of points.
     
 Please state the <b>ID of the faction</b> you are querying for.
 
@@ -991,7 +1009,7 @@ def handleTier1b(update, context, faction):
         selectedPreyTuple = sortedArr[preyIndex]
         pointsTxt += f"@{selectedPreyTuple[0]} - {selectedPreyTuple[1]}pts\n"
 
-    gameMasterText = f"""Here are the details of <b>{numPreyToSelect}</b> people from the prey faction of {factionsMap[faction]}, who <b>do not</b> possess the most number of points.
+    gameMasterText = f"""Here are the details of <b>{numPreyToSelect}</b> people from the <b>prey faction of {factionsMap[faction]}</b>, who <b>do not</b> possess the most number of points.
 
 {pointsTxt}
 ~ Shan Royale 2022 Team"""
@@ -1041,6 +1059,195 @@ def handleTier2a(update, context, faction):
                      message_id = update.callback_query.message.message_id,
                      parse_mode = 'HTML')
 
+def tier2bCmd(update, context):
+    killingPhase = checkKillingPhase(update, context)
+    if not killingPhase:
+        return
+    username = update.message.chat.username
+    gameMaster = checkGameMaster(update, context, username)
+    if not gameMaster:
+        return
+    
+    fullText = f"""You are querying for <b>{tier2bNumToSelect} people from the prey faction</b> of the requested faction, who <b>do not</b> possess the most number of points.
+    
+Please state the <b>ID of the faction</b> you are querying for.
+
+<b>Faction Legend:</b>"""
+    for id, name in factionsMap.items():
+        fullText += f"\nID {id}: {name}"
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     reply_markup = makeInlineKeyboard(factionsMap.keys(), OptionIDEnum.tier2b),
+                     parse_mode = 'HTML')
+
+def handleTier2b(update, context, faction):
+    killingPhase = checkKillingPhase(update, context, callback=True)
+    if not killingPhase:
+        return
+    username = update.callback_query.message.chat.username
+    gameMaster = checkGameMaster(update, context, username)
+    if not gameMaster:
+        return
+
+    userDb = userTracker[username]["db"]
+    preyFaction = userDb.getTargetFactionFromFaction(faction, currentGame.currentRound)
+    preyMemberPointsMap = userDb.getFactionMemberPoints(preyFaction, currentGame.currentRound)
+    sortedArr = sorted(preyMemberPointsMap.items(), key=lambda memberPoints: memberPoints[1], reverse=True)
+    print(f"Tier 2b Prey Faction Arr: {sortedArr}")
+    
+    numPreyLeft = len(sortedArr) - tier2bTopCut
+    if numPreyLeft <= 0:
+        print("ERROR: TOO LITTLE PREY LEFT ")
+        return
+
+    if numPreyLeft > tier2bNumToSelect:
+        numPreyToSelect = tier2bNumToSelect
+    else:
+        numPreyToSelect = numPreyLeft
+    
+    # RAndom num avoids top ppl specified by tier2bTopCut
+    #TODO: If num left < tier1bTopCut, this results in a loop
+    randomNumArray = []
+    for i in range(numPreyToSelect):
+        random_num = random.randint(tier2bTopCut, numPreyToSelect)
+        while random_num in randomNumArray:
+            random_num = random.randint(tier2bTopCut, numPreyToSelect)
+        randomNumArray.append(random_num)
+    print(randomNumArray)
+
+    pointsTxt = ""
+    for preyIndex in randomNumArray:
+        selectedPreyTuple = sortedArr[preyIndex]
+        pointsTxt += f"@{selectedPreyTuple[0]} - {selectedPreyTuple[1]}pts\n"
+
+    gameMasterText = f"""Here are the details of <b>{numPreyToSelect}</b> people from the <b>prey faction of {factionsMap[faction]}</b>, who <b>do not</b> possess the most number of points.
+
+{pointsTxt}
+~ Shan Royale 2022 Team"""
+    bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
+                     text = gameMasterText,
+                     message_id = update.callback_query.message.message_id,
+                     parse_mode = 'HTML')
+
+def tier3aCmd(update, context):
+    killingPhase = checkKillingPhase(update, context)
+    if not killingPhase:
+        return
+    username = update.message.chat.username
+    gameMaster = checkGameMaster(update, context, username)
+    if not gameMaster:
+        return
+    
+    fullText = f"""You are querying for:
+1) <b>The predator faction</b> of the requested faction AND
+2) The player from the predator faction with the <b>most kills</b>
+    
+Please state the <b>ID of the faction</b> you are querying for.
+
+<b>Faction Legend:</b>"""
+    for id, name in factionsMap.items():
+        fullText += f"\nID {id}: {name}"
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     reply_markup = makeInlineKeyboard(factionsMap.keys(), OptionIDEnum.tier3a),
+                     parse_mode = 'HTML')
+
+def handleTier3a(update, context, faction):
+    killingPhase = checkKillingPhase(update, context, callback=True)
+    if not killingPhase:
+        return
+    username = update.callback_query.message.chat.username
+    gameMaster = checkGameMaster(update, context, username)
+    if not gameMaster:
+        return
+
+    userDb = userTracker[username]["db"]
+    predatorFaction = userDb.getPredatorFaction(faction, currentGame.currentRound)
+    predatorFactionKDMap = userDb.getFactionMemberKD(faction, currentGame.currentRound)
+    sortedArr = sorted(predatorFactionKDMap.items(), key=lambda memberPoints: memberPoints[1][0], reverse=True)
+    predatorMostKillsTuple = sortedArr[0]
+
+    gameMasterText = f"""<b>{factionsMap[str(predatorFaction)]} (ID: {predatorFaction})</b> is the predator faction of {factionsMap[str(faction)]}!
+
+The player in the predator faction with most kills is @{predatorMostKillsTuple[0]}, with {predatorMostKillsTuple[1][0]} kills.
+
+~ Shan Royale 2022 Team"""
+    bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
+                     text = gameMasterText,
+                     message_id = update.callback_query.message.message_id,
+                     parse_mode = 'HTML')
+
+def tier3bCmd(update, context):
+    killingPhase = checkKillingPhase(update, context)
+    if not killingPhase:
+        return
+    username = update.message.chat.username
+    gameMaster = checkGameMaster(update, context, username)
+    if not gameMaster:
+        return
+    
+    fullText = f"""You are querying for <b>{tier2bNumToSelect} people from the prey faction</b> of the requested faction, who <b>do not</b> possess the most number of points.
+    
+Please state the <b>ID of the faction</b> you are querying for.
+
+<b>Faction Legend:</b>"""
+    for id, name in factionsMap.items():
+        fullText += f"\nID {id}: {name}"
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     reply_markup = makeInlineKeyboard(factionsMap.keys(), OptionIDEnum.tier2b),
+                     parse_mode = 'HTML')
+
+def handleTier3b(update, context, faction):
+    killingPhase = checkKillingPhase(update, context, callback=True)
+    if not killingPhase:
+        return
+    username = update.callback_query.message.chat.username
+    gameMaster = checkGameMaster(update, context, username)
+    if not gameMaster:
+        return
+
+    userDb = userTracker[username]["db"]
+    preyFaction = userDb.getTargetFactionFromFaction(faction, currentGame.currentRound)
+    preyMemberPointsMap = userDb.getFactionMemberPoints(preyFaction, currentGame.currentRound)
+    sortedArr = sorted(preyMemberPointsMap.items(), key=lambda memberPoints: memberPoints[1], reverse=True)
+    print(f"Tier 2b Prey Faction Arr: {sortedArr}")
+    
+    numPreyLeft = len(sortedArr) - tier2bTopCut
+    if numPreyLeft <= 0:
+        print("ERROR: TOO LITTLE PREY LEFT ")
+        return
+
+    if numPreyLeft > tier2bNumToSelect:
+        numPreyToSelect = tier2bNumToSelect
+    else:
+        numPreyToSelect = numPreyLeft
+    
+    # RAndom num avoids top ppl specified by tier2bTopCut
+    #TODO: If num left < tier1bTopCut, this results in a loop
+    randomNumArray = []
+    for i in range(numPreyToSelect):
+        random_num = random.randint(tier2bTopCut, numPreyToSelect)
+        while random_num in randomNumArray:
+            random_num = random.randint(tier2bTopCut, numPreyToSelect)
+        randomNumArray.append(random_num)
+    print(randomNumArray)
+
+    pointsTxt = ""
+    for preyIndex in randomNumArray:
+        selectedPreyTuple = sortedArr[preyIndex]
+        pointsTxt += f"@{selectedPreyTuple[0]} - {selectedPreyTuple[1]}pts\n"
+
+    gameMasterText = f"""Here are the details of <b>{numPreyToSelect}</b> people from the <b>prey faction of {factionsMap[faction]}</b>, who <b>do not</b> possess the most number of points.
+
+{pointsTxt}
+~ Shan Royale 2022 Team"""
+    bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
+                     text = gameMasterText,
+                     message_id = update.callback_query.message.message_id,
+                     parse_mode = 'HTML')
+
+
 #===================Message and Callback Handlers==============================
 def mainMessageHandler(update, context):
     username = update.message.chat.username
@@ -1086,15 +1293,15 @@ def mainCallBackHandler(update, context):
     if optionID == str(OptionIDEnum.tier2a):
         handleTier2a(update, context, value)
         return
-    # if optionID == str(OptionIDEnum.tier2b):
-    #     handleTier2b(update, context, value)
-    #     return
-    # if optionID == str(OptionIDEnum.tier3a):
-    #     handleTier3a(update, context, value)
-    #     return
-    # if optionID == str(OptionIDEnum.tier3b):
-    #     handleTier3b(update, context, value)
-    #     return
+    if optionID == str(OptionIDEnum.tier2b):
+        handleTier2b(update, context, value)
+        return
+    if optionID == str(OptionIDEnum.tier3a):
+        handleTier3a(update, context, value)
+        return
+    if optionID == str(OptionIDEnum.tier3b):
+        handleTier3b(update, context, value)
+        return
     else:
         print(f'ERROR IN CALLBACKHANDLER: No such optionID defined ({optionID})\nValue: {value}')
         return
@@ -1251,9 +1458,9 @@ def main():
     dp.add_handler(CommandHandler("tier1a", tier1aCmd))
     dp.add_handler(CommandHandler("tier1b", tier1bCmd))
     dp.add_handler(CommandHandler("tier2a", tier2aCmd))
-    # dp.add_handler(CommandHandler("tier2b", tier2bCmd))
-    # dp.add_handler(CommandHandler("tier3a", tier3aCmd))
-    # dp.add_handler(CommandHandler("tier3b", tier3bCmd))
+    dp.add_handler(CommandHandler("tier2b", tier2bCmd))
+    dp.add_handler(CommandHandler("tier3a", tier3aCmd))
+    dp.add_handler(CommandHandler("tier3b", tier3bCmd))
 
     # Handle all messages
     dp.add_handler(MessageHandler(callback=mainMessageHandler, filters=Filters.all))
