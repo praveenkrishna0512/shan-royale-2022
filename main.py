@@ -4,7 +4,7 @@ import enum
 import json
 import logging
 from os import kill
-from random import randint, random
+import random
 from sqlite3 import Time
 from tabnanny import check
 import time
@@ -517,10 +517,10 @@ Press yes if you wish to proceed."""
 def handleDying(update, context, yesNo):
     chat_id = update.callback_query.message.chat.id
     message_id = update.callback_query.message.message_id
-    safe = checkSafetyBreaches(update, context)
+    safe = checkSafetyBreaches(update, context, callback=True)
     if not safe:
         return
-    killingPhase = checkKillingPhase(update, context)
+    killingPhase = checkKillingPhase(update, context, callback=True)
     if not killingPhase:
         setState(username, None)
         return
@@ -641,7 +641,7 @@ def checkImmunity(update, context, username):
     remainingTime = playerImmunityExpiry - currentTime
     if remainingTime > 0:
         fullText = f"You are still immune for {remainingTime} seconds!\n\nYou may not be killed or kill!"
-        bot.send_message(chat_id = update.message.chat.id,
+        bot.send_message(chat_id = userTracker[username]["chat_id"],
                      text = fullText,
                      parse_mode = 'HTML')
         return True
@@ -812,9 +812,6 @@ def visitSpyStationCmd(update, context):
     killingPhase = checkKillingPhase(update, context)
     if not killingPhase:
         return
-    playPhase = checkPlayPhase(update, context)
-    if not playPhase:
-        return
     safe = checkSafetyBreaches(update, context)
     if not safe:
         return
@@ -880,12 +877,17 @@ def visitedSpyStation(update, context, username):
 
 #========================Spy Master Commands==================================
 def tier1aCmd(update, context):
+    killingPhase = checkKillingPhase(update, context)
+    if not killingPhase:
+        return
     username = update.message.chat.username
     gameMaster = checkGameMaster(update, context, username)
     if not gameMaster:
         return
     
-    fullText = f"""Please state the <b>ID of the faction</b> you are querying for.
+    fullText = f"""You are querying for 1 Faction that is NOT the predator faction of the requested faction
+    
+Please state the <b>ID of the faction</b> you are querying for.
 
 <b>Faction Legend:</b>"""
     for id, name in factionsMap.items():
@@ -895,9 +897,63 @@ def tier1aCmd(update, context):
                      reply_markup = makeInlineKeyboard(factionsMap.keys(), OptionIDEnum.tier1a),
                      parse_mode = 'HTML')
 
-#TODO: HERE NOW
 def handleTier1a(update, context, faction):
+    killingPhase = checkKillingPhase(update, context, callback=True)
+    if not killingPhase:
+        return
     username = update.callback_query.message.chat.username
+    gameMaster = checkGameMaster(update, context, username)
+    if not gameMaster:
+        return
+
+    userDb = userTracker[username]["db"]
+    predatorFaction = userDb.getPredatorFaction(faction, currentGame.currentRound)
+    nonPredatorFactions = []
+    for factionID in factionsMap.keys():
+        if factionID == str(faction) or factionID == str(predatorFaction):
+            continue
+        nonPredatorFactions.append(factionID)
+    random_num = random.randint(0, len(factionsMap) - 1 - 2)
+    selectedFaction = nonPredatorFactions[int(random_num)]
+
+    gameMasterText = f"""Faction {factionsMap[selectedFaction]} (ID: {selectedFaction}) is not the predator faction of Faction {factionsMap[faction]}!
+
+~ Shan Royale 2022 Team"""
+    bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
+                     text = gameMasterText,
+                     message_id = update.callback_query.message.message_id,
+                     parse_mode = 'HTML')
+
+def tier1bCmd(update, context):
+    killingPhase = checkKillingPhase(update, context)
+    if not killingPhase:
+        return
+    username = update.message.chat.username
+    gameMaster = checkGameMaster(update, context, username)
+    if not gameMaster:
+        return
+    
+    fullText = f"""You are querying for 2 people from the prey faction of the requested faction, who <b>do not</b> possess the most number of points.
+    
+Please state the <b>ID of the faction</b> you are querying for.
+
+<b>Faction Legend:</b>"""
+    for id, name in factionsMap.items():
+        fullText += f"\nID {id}: {name}"
+    bot.send_message(chat_id = update.message.chat.id,
+                     text = fullText,
+                     reply_markup = makeInlineKeyboard(factionsMap.keys(), OptionIDEnum.tier2a),
+                     parse_mode = 'HTML')
+
+def handleTier1b(update, context, faction):
+    killingPhase = checkKillingPhase(update, context, callback=True)
+    if not killingPhase:
+        return
+    username = update.callback_query.message.chat.username
+    gameMaster = checkGameMaster(update, context, username)
+    if not gameMaster:
+        return
+
     userDb = userTracker[username]["db"]
     enemyFaction = userDb.getTargetFactionFromFaction(faction, currentGame.currentRound)
     nonEnemyFactions = []
@@ -905,7 +961,17 @@ def handleTier1a(update, context, faction):
         if factionID == str(faction) or factionID == str(enemyFaction):
             continue
         nonEnemyFactions.append(factionID)
-    random_num = random()
+    random_num = random.randint(0, len(factionsMap) - 1 - 2)
+    selectedFaction = nonEnemyFactions[int(random_num)]
+
+    gameMasterText = f"""Faction {factionsMap[selectedFaction]} (ID: {selectedFaction}) is not the prey faction of Faction {factionsMap[faction]}!
+
+~ Shan Royale 2022 Team"""
+    bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
+                     text = gameMasterText,
+                     message_id = update.callback_query.message.message_id,
+                     parse_mode = 'HTML')
+
 
 
 #===================Message and Callback Handlers==============================
@@ -947,6 +1013,21 @@ def mainCallBackHandler(update, context):
     if optionID == str(OptionIDEnum.tier1a):
         handleTier1a(update, context, value)
         return
+    if optionID == str(OptionIDEnum.tier1b):
+        handleTier1b(update, context, value)
+        return
+    # if optionID == str(OptionIDEnum.tier2a):
+    #     handleTier2a(update, context, value)
+    #     return
+    # if optionID == str(OptionIDEnum.tier2b):
+    #     handleTier2b(update, context, value)
+    #     return
+    # if optionID == str(OptionIDEnum.tier3a):
+    #     handleTier3a(update, context, value)
+    #     return
+    # if optionID == str(OptionIDEnum.tier3b):
+    #     handleTier3b(update, context, value)
+    #     return
     else:
         print(f'ERROR IN CALLBACKHANDLER: No such optionID defined ({optionID})\nValue: {value}')
         return

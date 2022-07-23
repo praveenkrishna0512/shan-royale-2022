@@ -231,6 +231,12 @@ class DBHelper:
         for x in self.conn.execute(stmt, args):
             return x[0]
 
+    def getPredatorFaction(self, faction, round_num):
+        stmt = f"SELECT faction FROM {self.factionTable} WHERE enemyFactionRound{round_num} = (?)"
+        args = (faction, )
+        for x in self.conn.execute(stmt, args):
+            return x[0]
+
     def getPlayerFaction(self, username, round_num):
         stmt = f"SELECT faction FROM {self.playerTable}{round_num} WHERE username = (?)"
         args = (username, )
