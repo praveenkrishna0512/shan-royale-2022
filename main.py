@@ -71,6 +71,7 @@ tier1bNumToSelect = 2
 tier1bTopCut = 1
 tier2bNumToSelect = 10
 tier2bTopCut = 1
+tier3bNumToSelect = 3
 
 #=============================Texts==========================================
 dontWasteMyTimeText = """\"<b>Don't waste my time...</b> You aren't allowed to use this command now.\"
@@ -1186,7 +1187,7 @@ def tier3bCmd(update, context):
     if not gameMaster:
         return
     
-    fullText = f"""You are querying for <b>{tier2bNumToSelect} people from the prey faction</b> of the requested faction, who <b>do not</b> possess the most number of points.
+    fullText = f"""You are querying for <b>{tier3bNumToSelect} people from the prey faction</b> of the requested faction, who possess the <b>most number of points</b>.
     
 Please state the <b>ID of the faction</b> you are querying for.
 
@@ -1195,7 +1196,7 @@ Please state the <b>ID of the faction</b> you are querying for.
         fullText += f"\nID {id}: {name}"
     bot.send_message(chat_id = update.message.chat.id,
                      text = fullText,
-                     reply_markup = makeInlineKeyboard(factionsMap.keys(), OptionIDEnum.tier2b),
+                     reply_markup = makeInlineKeyboard(factionsMap.keys(), OptionIDEnum.tier3b),
                      parse_mode = 'HTML')
 
 def handleTier3b(update, context, faction):
@@ -1211,34 +1212,22 @@ def handleTier3b(update, context, faction):
     preyFaction = userDb.getTargetFactionFromFaction(faction, currentGame.currentRound)
     preyMemberPointsMap = userDb.getFactionMemberPoints(preyFaction, currentGame.currentRound)
     sortedArr = sorted(preyMemberPointsMap.items(), key=lambda memberPoints: memberPoints[1], reverse=True)
-    print(f"Tier 2b Prey Faction Arr: {sortedArr}")
+    print(f"Tier 3b Prey Faction Arr: {sortedArr}")
     
-    numPreyLeft = len(sortedArr) - tier2bTopCut
-    if numPreyLeft <= 0:
-        print("ERROR: TOO LITTLE PREY LEFT ")
-        return
-
-    if numPreyLeft > tier2bNumToSelect:
-        numPreyToSelect = tier2bNumToSelect
-    else:
-        numPreyToSelect = numPreyLeft
     
-    # RAndom num avoids top ppl specified by tier2bTopCut
-    #TODO: If num left < tier1bTopCut, this results in a loop
-    randomNumArray = []
-    for i in range(numPreyToSelect):
-        random_num = random.randint(tier2bTopCut, numPreyToSelect)
-        while random_num in randomNumArray:
-            random_num = random.randint(tier2bTopCut, numPreyToSelect)
-        randomNumArray.append(random_num)
-    print(randomNumArray)
+    numPreyToSelect = tier3bNumToSelect
+    if len(sortedArr) <= tier3bNumToSelect:
+        numPreyToSelect = len(sortedArr)
+    
+    indexArray = [x for x in range(numPreyToSelect)]
+    print(indexArray)
 
     pointsTxt = ""
-    for preyIndex in randomNumArray:
+    for preyIndex in indexArray:
         selectedPreyTuple = sortedArr[preyIndex]
         pointsTxt += f"@{selectedPreyTuple[0]} - {selectedPreyTuple[1]}pts\n"
 
-    gameMasterText = f"""Here are the details of <b>{numPreyToSelect}</b> people from the <b>prey faction of {factionsMap[faction]}</b>, who <b>do not</b> possess the most number of points.
+    gameMasterText = f"""Here are the details of <b>{numPreyToSelect}</b> people from the <b>prey faction of {factionsMap[faction]}</b>, who possess the <b>most number of points</b>.
 
 {pointsTxt}
 ~ Shan Royale 2022 Team"""
@@ -1246,7 +1235,6 @@ def handleTier3b(update, context, faction):
                      text = gameMasterText,
                      message_id = update.callback_query.message.message_id,
                      parse_mode = 'HTML')
-
 
 #===================Message and Callback Handlers==============================
 def mainMessageHandler(update, context):
