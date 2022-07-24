@@ -31,7 +31,8 @@ excelFilePath = "./excel/shanRoyale2022Data1.xlsx"
 playerDataRound1JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="playerDataRound1").to_json(orient='records'))
 playerDataRound2JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="playerDataRound2").to_json(orient='records'))
 factionDataJSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="factionData").to_json(orient='records'))
-mainDb = DBHelper()
+# TODO: HAVE TO DELETE DB B4 TRYING
+mainDb = DBHelper("shan-royale.sqlite")
 mainDb.playerDataJSONArrToDB(playerDataRound1JSONArr, 1)
 mainDb.playerDataJSONArrToDB(playerDataRound2JSONArr, 2)
 mainDb.factionDataJSONArrToDB(factionDataJSONArr)
@@ -295,6 +296,7 @@ If there are no more round, hope you enjoyed the game and please gather at your 
     blastMessageToAll(blastText)
 
 # TODO: SORT ALL VALUES
+# TODO: HERE NOW
 # TODO: Showing player text is too long, figure out if Casper needs it
 def adminFactionDetails(update, context):
     username = update.message.chat.username
@@ -697,20 +699,17 @@ def helpCmd(update, context):
     fullText = "<b>COMMANDS</b>"
 
     username = update.message.chat.username
-    isAdmin = checkAdmin(update, context, username)
-    if isAdmin:
+    if username in admins:
         fullText += "\n\n" + adminCmds + "\n\n" + gamemasterCmds + "\n\n" + safetyCmds + "\n\n" + playerCmds
         update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
         return
     
-    isGamemaster = checkGameMaster(update, context, username)
-    if isGamemaster:
+    if username in gameMasters:
         fullText += "\n\n" + gamemasterCmds + "\n\n" + safetyCmds + "\n\n" + playerCmds
         update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
         return
     
-    isSafety = checkSafety(update, context, username)
-    if isSafety:
+    if username in safetyOfficers:
         fullText += "\n\n" + safetyCmds + "\n\n" + playerCmds
         update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
         return
@@ -723,7 +722,6 @@ def error(update, context):
     logger.warning('Update "%s" caused error "%s"', update, context.error)
 
 #===========================General Player Cmds======================
-# TODO: SORT POINTS IF POSSIBLE
 def factionCmd(update, context):
     safe = checkSafetyBreaches(update, context)
     if not safe:
