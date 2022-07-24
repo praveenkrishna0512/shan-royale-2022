@@ -27,7 +27,7 @@ if API_KEY == None:
     raise Exception("Please update API Key")
 
 # Excel to Database
-excelFilePath = "./excel/shanRoyale2022Data3.xlsx"
+excelFilePath = "./excel/shanRoyale2022Data1.xlsx"
 playerDataRound1JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="playerDataRound1").to_json(orient='records'))
 playerDataRound2JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="playerDataRound2").to_json(orient='records'))
 factionDataJSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="factionData").to_json(orient='records'))
@@ -735,17 +735,28 @@ def factionCmd(update, context):
     factionBank = userDb.getBank(playerFaction)
     factionMembersPointsMap = userDb.getFactionMemberPoints(playerFaction, currentGame.currentRound)
     factionKDArrMap = userDb.getFactionMemberKD(playerFaction, currentGame.currentRound)
+    
+    sortedMemberPointsArr = sorted(factionMembersPointsMap.items(), key=lambda memberPoints: memberPoints[1], reverse=True)
+    sortedKillsMemberKDArr = sorted(factionKDArrMap.items(), key=lambda memberKD: memberKD[1][0], reverse=True)
+    sortedDeathsMemberKDArr = sorted(factionKDArrMap.items(), key=lambda memberKD: memberKD[1][1], reverse=True)
 
     header = f"<b>{factionsMap[str(playerFaction)]} Faction Stats (id: {playerFaction})</b>"
     bankTxt = f"\n\n<b>Bank:</b> {factionBank}"
     pointsTxt = "\n\n<b>Current Points:</b>"
     killCountTxt = "\n\n<b>Kill Count:</b>"
     deathCountTxt = "\n\n<b>Death Count:</b>"
-    for username, points in factionMembersPointsMap.items():
+    for memberPoints in sortedMemberPointsArr:
+        username = memberPoints[0]
+        points = memberPoints[1]
         pointsTxt += f"\n@{username}: {points}pts"
-    for username, KDArr in factionKDArrMap.items():
-        killCountTxt += f"\n@{username}: {KDArr[0]}"
-        deathCountTxt += f"\n@{username}: {KDArr[1]}"
+    for memberKD in sortedKillsMemberKDArr:
+        username = memberKD[0]
+        kills = memberKD[1][0]
+        killCountTxt += f"\n@{username}: {kills}"
+    for memberKD in sortedDeathsMemberKDArr:
+        username = memberKD[0]
+        death = memberKD[1][1]
+        deathCountTxt += f"\n@{username}: {death}"
     fullText = header + bankTxt + pointsTxt + killCountTxt + deathCountTxt
 
     bot.send_message(chat_id = update.message.chat.id,
@@ -1734,6 +1745,7 @@ Round 2 - {currentGame.stickRound2}"""
                      text = fullText,
                      parse_mode = 'HTML')
 
+#TODO: Add in elimination tiers
 def eliminationCmd(update, context):
     killingPhase = checkKillingPhase(update, context)
     if not killingPhase:
