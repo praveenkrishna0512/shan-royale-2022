@@ -752,7 +752,6 @@ def factionCmd(update, context):
         text = fullText,
         parse_mode = 'HTML')
 
-#TODO: SORT BANKS IF POSSIBLE
 def listBanksCmd(update, context):
     safe = checkSafetyBreaches(update, context)
     if not safe:
@@ -760,10 +759,17 @@ def listBanksCmd(update, context):
 
     username = update.message.chat.username
     userDb = userTracker[username]["db"]
-    bankTxt = "<b>Faction Banks</b>\n"
+    factionBankMap = {}
     for faction, name in factionsMap.items():
         factionBank = userDb.getBank(faction)
-        bankTxt += f"\n<b>{name}:</b> {factionBank}pts"
+        factionBankMap[name] = factionBank
+    sortedArr = sorted(factionBankMap.items(), key=lambda factionBank: factionBank[1], reverse=True)
+
+    bankTxt = "<b>Faction Banks</b> (Sorted Order)\n"
+    for factionBank in sortedArr:
+        name = factionBank[0]
+        bank = factionBank[1]
+        bankTxt += f"\n<b>{name}:</b> {bank}pts"
     
     bot.send_message(chat_id = update.message.chat.id,
         text = bankTxt,
@@ -834,7 +840,6 @@ Click <b>/setpoints</b> again to <b>reset</b> points for this round!
     
     setState(username, None)
 
-# TODO: Sort Points
 def listPointsCmd(update, context):
     playPhase = checkPlayPhase(update, context)
     if not playPhase:
