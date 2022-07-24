@@ -603,7 +603,6 @@ def handleRedCard(update, context, offenderUsername):
     setState(username, None)
 
 #========================Player Command Handlers===============================================
-# Sends start command and registers new usernames
 def startCmd(update, context):
     username = update.message.chat.username
 
@@ -777,7 +776,6 @@ def listBanksCmd(update, context):
         parse_mode = 'HTML')
 
 #===========================Set points==============================
-#TODO: SHOW CURRENT POINTS ASSIGNED
 def setPointsCmd(update, context):
     setPointsPhase = checkSetPointsPhase(update, context)
     if not setPointsPhase:
@@ -788,9 +786,15 @@ def setPointsCmd(update, context):
         return
 
     username = update.message.chat.username
+    db = userTracker[username]["db"]
+    playerFaction = db.getPlayerFaction(username, currentGame.currentRound)
+    currentFactionPoints = db.getFactionPoints(playerFaction, currentGame.currentRound)
     setState(username, StateEnum.setPoints)
 
     fullText = f"""Type in the points allocated to you in <b>Round {currentGame.currentRound}</b>\n
+
+Points Assigned Faction-wide so far: <b>{currentFactionPoints}</b>pts
+
 Take Note:<em>
 - Everyone must be allocated at least <b>5 points</b>
 - <b>Do not exceed</b> your total team points of 200!
@@ -800,7 +804,7 @@ Take Note:<em>
         text = fullText,
         parse_mode = 'HTML')
 
-#TODO: SHOW CURRENT POINTS ASSIGNED
+# TODO: Sort Points
 def handleSetPoints(update, context, text):
     chat_id = update.message.chat.id
     username = update.message.chat.username
@@ -814,15 +818,21 @@ def handleSetPoints(update, context, text):
     if not safe:
         return
 
-    invalid = invalidPoints(chat_id, text)
+    db = userTracker[username]["db"]
+    playerFaction = db.getPlayerFaction(username, currentGame.currentRound)
+    currentFactionPoints = db.getFactionPoints(playerFaction, currentGame.currentRound)
+    invalid = invalidPoints(chat_id, text, currentFactionPoints)
     if invalid:
         return
     points = int(text)
 
-    db = userTracker[username]["db"]
     db.updateRoundPoints(username, points, currentGame.currentRound)
+    updatedFactionPoints = db.getFactionPoints(playerFaction, currentGame.currentRound)
 
     fullText = f"""Allocated {points} points to you for <b>Round {currentGame.currentRound}</b>\n\n
+
+Points Assigned Faction-wide so far: {updatedFactionPoints}pts
+
 Click <b>/setpoints</b> again to <b>reset</b> points for this round!
 """
     bot.send_message(chat_id = chat_id,
@@ -831,6 +841,7 @@ Click <b>/setpoints</b> again to <b>reset</b> points for this round!
     
     setState(username, None)
 
+# TODO: Sort Points
 def listPointsCmd(update, context):
     playPhase = checkPlayPhase(update, context)
     if not playPhase:
@@ -847,16 +858,18 @@ def listPointsCmd(update, context):
 
     txt1 = f"Here are the current updated points held by your {factionsMap[str(playerFaction)]} faction members\n"
     txt2 = ""
+    totalPoints = 0
     for username, points in factionMembersPointsMap.items():
+        totalPoints += int(points)
         txt2 += f"\n@{username}: {points}pts"
-    fullText = txt1 + txt2
+    header = f"<b>{factionsMap[playerFaction]} Points Summary</b>\n\nTotal: {totalPoints}pts\n\n"
+    fullText = header + txt1 + txt2
 
     bot.send_message(chat_id = update.message.chat.id,
         text = fullText,
         parse_mode = 'HTML')
 
-#TODO ADD CHECKS FOR TEAM POINTS TOO!
-def invalidPoints(chat_id, text):
+def invalidPoints(chat_id, text, currentFactionPoints):
     try:
         points = int(text)
     except:
@@ -866,16 +879,30 @@ def invalidPoints(chat_id, text):
             parse_mode = 'HTML')
         return True
 
-    if points >= minPoints:
-        return False
-
-    fullText = f"""Too little points for <b>Round {currentGame.currentRound}</b>!
+    if points < minPoints:
+        fullText = f"""Too little points for <b>Round {currentGame.currentRound}</b>!
 Everyone must be allocated at least <b>5 points</b>.\n
 Please enter your points for this round again"""
-    bot.send_message(chat_id = chat_id,
-        text = fullText,
-        parse_mode = 'HTML')
-    return True
+        bot.send_message(chat_id = chat_id,
+            text = fullText,
+            parse_mode = 'HTML')
+        return True
+    
+    proposedPoints = currentFactionPoints + points
+    if proposedPoints > maxTeamPoints:
+        fullText = f"""You may not add {points}pts to yourself, as that will bring your faction's total points assigned to  <b>{proposedPoints}</b>!
+
+Enter /listpoints to see the distribution of points within your faction, and ensure that it tallies to <b>{maxTeamPoints}</b>.
+
+Please enter your points for this round again."""
+        bot.send_message(chat_id = chat_id,
+            text = fullText,
+            parse_mode = 'HTML')
+        return True
+    
+    return False
+
+    
 
 #=========================Killing Mechanism================================
 def dyingCmd(update, context):
