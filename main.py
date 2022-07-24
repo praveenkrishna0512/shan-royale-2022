@@ -202,9 +202,6 @@ Are you okay with this?"""
                      reply_markup = makeInlineKeyboard(yesNoList, OptionIDEnum.endSetPoints),
                      parse_mode = 'HTML')
 
-# TODO: Check if all points are above 5
-# If it is not, highlight the relevant faction with lesser than 5 points,
-# and their current points assigned
 def handleAdminEndSetPoints(update, context, yesNo):
     global currentGame
     chat_id = update.callback_query.message.chat.id
@@ -607,7 +604,7 @@ def startCmd(update, context):
     username = update.message.chat.username
 
     # Create database (this is required to ensure multiple ppl dont use the same db object)
-    db = DBHelper("shan-royale.sqlite")
+    db = DBHelper()
     userExists = db.checkUsernameInDB(username)
     if not userExists:
         errorText = """Your username is <b>NOT in the database</b>. If you have changed your username after registering for TSE, please change your username back and try /start again.\n\n
@@ -633,30 +630,27 @@ Please contact @praveeeenk if the problem persists."""
             "elimination_target": ""
         }
         userTracker[username] = newUserTracker
-        #TODO: REMOVE!!
-        vigTracker = {
-            'state': None,
-            'db': DBHelper(),
-            'chat_id': "258884638",
-            "elimination_target": ""
-        }
-        userTracker["vigonometry"] = vigTracker
-        #TODO: REMOVE!!
-        danTracker = {
-            'state': None,
-            'db': DBHelper(),
-            'chat_id': "258884638",
-            "elimination_target": ""
-        }
-        userTracker["ddannyiel"] = danTracker
-        #TODO: REMOVE!!
-        casperTracker = {
-            'state': None,
-            'db': DBHelper(),
-            'chat_id': "355739375",
-            "elimination_target": ""
-        }
-        userTracker["Casperplz"] = casperTracker
+        # vigTracker = {
+        #     'state': None,
+        #     'db': DBHelper(),
+        #     'chat_id': "258884638",
+        #     "elimination_target": ""
+        # }
+        # userTracker["vigonometry"] = vigTracker
+        # danTracker = {
+        #     'state': None,
+        #     'db': DBHelper(),
+        #     'chat_id': "258884638",
+        #     "elimination_target": ""
+        # }
+        # userTracker["ddannyiel"] = danTracker
+        # casperTracker = {
+        #     'state': None,
+        #     'db': DBHelper(),
+        #     'chat_id': "355739375",
+        #     "elimination_target": ""
+        # }
+        # userTracker["Casperplz"] = casperTracker
 
     print("User Tracker: " + str(userTracker))
 
@@ -804,7 +798,6 @@ Take Note:<em>
         text = fullText,
         parse_mode = 'HTML')
 
-# TODO: Sort Points
 def handleSetPoints(update, context, text):
     chat_id = update.message.chat.id
     username = update.message.chat.username
@@ -855,14 +848,17 @@ def listPointsCmd(update, context):
     userDb = userTracker[username]["db"]
     playerFaction = userDb.getPlayerFaction(username, currentGame.currentRound)
     factionMembersPointsMap = userDb.getFactionMemberPoints(playerFaction, currentGame.currentRound)
+    sortedArr = sorted(factionMembersPointsMap.items(), key=lambda memberPoints: memberPoints[1], reverse=True)
 
     txt1 = f"Here are the current updated points held by your {factionsMap[str(playerFaction)]} faction members\n"
     txt2 = ""
     totalPoints = 0
-    for username, points in factionMembersPointsMap.items():
+    for memberPoints in sortedArr:
+        username = memberPoints[0]
+        points = memberPoints[1]
         totalPoints += int(points)
         txt2 += f"\n@{username}: {points}pts"
-    header = f"<b>{factionsMap[playerFaction]} Points Summary</b>\n\nTotal: {totalPoints}pts\n\n"
+    header = f"<b>{factionsMap[str(playerFaction)]} Points Summary</b>\n\n<b>Total: {totalPoints}pts</b>\n\n"
     fullText = header + txt1 + txt2
 
     bot.send_message(chat_id = update.message.chat.id,
@@ -890,9 +886,9 @@ Please enter your points for this round again"""
     
     proposedPoints = currentFactionPoints + points
     if proposedPoints > maxTeamPoints:
-        fullText = f"""You may not add {points}pts to yourself, as that will bring your faction's total points assigned to  <b>{proposedPoints}</b>!
+        fullText = f"""You <b>may not add {points}pts</b> to yourself, as that will bring your faction's total points assigned to <b>{proposedPoints}pts</b>!
 
-Enter /listpoints to see the distribution of points within your faction, and ensure that it tallies to <b>{maxTeamPoints}</b>.
+Enter /listpoints to see the distribution of points within your faction, and ensure that it tallies to <b>{maxTeamPoints}pts</b>.
 
 Please enter your points for this round again."""
         bot.send_message(chat_id = chat_id,
@@ -901,8 +897,6 @@ Please enter your points for this round again."""
         return True
     
     return False
-
-    
 
 #=========================Killing Mechanism================================
 def dyingCmd(update, context):
