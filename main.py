@@ -27,6 +27,7 @@ if API_KEY == None:
     raise Exception("Please update API Key")
 
 # Excel to Database
+# TODO: CHANGE TO ACTUAL EXCEL SHEET
 excelFilePath = "./excel/shanRoyale2022Data1.xlsx"
 playerDataRound1JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="playerDataRound1").to_json(orient='records'))
 playerDataRound2JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="playerDataRound2").to_json(orient='records'))
@@ -74,9 +75,9 @@ wrongKillPenalty = 50
 
 #TODO: ASK CASPER IF OKAY, INFORM CASPER IF NEED BE SHORTER
 tier1bNumToSelect = 2
-tier1bTopCut = 1
+tier1bTopCut = 5
 tier2bNumToSelect = 10
-tier2bTopCut = 1
+tier2bTopCut = 5
 tier3bNumToSelect = 3
 maxStickPerRound = 10
 stickExpiryInSecs = 600
