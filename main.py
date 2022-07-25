@@ -45,9 +45,9 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 # Initialise bot
-bot = telebot.TeleBot(API_KEY, parse_mode = None)
+bot = telebot.TeleBot(API_KEY, parse_mode=None)
 
-#============================Constants======================================
+# ============================Constants======================================
 roundList = [1, 2]
 yesNoList = ["Yes", "No"]
 
@@ -61,8 +61,10 @@ factionsMap = {
 }
 
 admins = ["praveeeenk", "Casperplz"]
-gameMasters = ["praveeeenk", "Casperplz", "ddannyiel", "Jobeet", "kelsykoh", "keziakhoo", "vigonometry"]
-safetyOfficers = ["praveeeenk", "Casperplz", "ddannyiel", "Jobeet", "kelsykoh", "keziakhoo", "vigonometry"]
+gameMasters = ["praveeeenk", "Casperplz", "ddannyiel",
+    "Jobeet", "kelsykoh", "keziakhoo", "vigonometry"]
+safetyOfficers = ["praveeeenk", "Casperplz", "ddannyiel",
+    "Jobeet", "kelsykoh", "keziakhoo", "vigonometry"]
 
 # TODO: LOAD UPON RESUME
 adminQuery = {}
@@ -73,7 +75,7 @@ highestAllowedSafetyBreach = 2
 immuneSecondsUponDeath = 90
 wrongKillPenalty = 50
 
-#TODO: ASK CASPER IF OKAY, INFORM CASPER IF NEED BE SHORTER
+# TODO: ASK CASPER IF OKAY, INFORM CASPER IF NEED BE SHORTER
 tier1bNumToSelect = 2
 tier1bTopCut = 5
 tier2bNumToSelect = 10
@@ -82,12 +84,14 @@ tier3bNumToSelect = 3
 maxStickPerRound = 10
 stickExpiryInSecs = 600
 
-#=============================Texts==========================================
+# =============================Texts==========================================
 dontWasteMyTimeText = """\"<b>Don't waste my time...</b> You aren't allowed to use this command now.\"
 ~ Message by Caserplz"""
 
-#============================Tracking State===================================
+# ============================Tracking State===================================
 # Possible states
+
+
 class StateEnum(enum.Enum):
     setPoints = "setPoints"
     kill = "kill"
@@ -97,6 +101,7 @@ class StateEnum(enum.Enum):
     adminBroadcast = "adminBroadcast"
     yellowCard = "yellowCard"
     redCard = "redCard"
+
 
 class OptionIDEnum(enum.Enum):
     beginRound = "beginRound"
@@ -114,29 +119,35 @@ class OptionIDEnum(enum.Enum):
     adminAddPoints = "adminAddPoints"
     adminBroadcast = "adminBroadcast"
 
+
 # Handles state of the bot for each user
 # Key: username
 # Value: dynamic dictionary
 # TODO: LOAD UPON RESUME
 userTracker = {}
 
+
 def setState(username, state):
     userTracker[username].update({"state": state})
     print("State updated for " + username + ": " + str(userTracker[username]))
 
-#============================Key boards===================================
+# ============================Key boards===================================
 # Makes Inline Keyboard
+
+
 def makeInlineKeyboard(lst, optionID):
     markup = types.InlineKeyboardMarkup()
     for value in lst:
-        markup.add(types.InlineKeyboardButton(text = value,
-                                            callback_data = f"['optionID', '{optionID}', 'value', '{value}']"))
+        markup.add(types.InlineKeyboardButton(text=value,
+                                              callback_data=f"['optionID', '{optionID}', 'value', '{value}']"))
     return markup
 
-#============================DB to file converters?===========================
+# ============================DB to file converters?===========================
 # TODO: DB to main file converters (maybe put in dbhelper.py)
 
 # ====================== Admin Commands ===============================
+
+
 def adminBeginRoundCmd(update, context):
     username = update.message.chat.username
     isAdmin = checkAdmin(update, context, username)
@@ -145,10 +156,12 @@ def adminBeginRoundCmd(update, context):
 
     text = """You are about to begin a round!\n
 Which round to you want to begin?"""
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = text,
-                     reply_markup = makeInlineKeyboard(roundList, OptionIDEnum.beginRound),
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=text,
+                     reply_markup=makeInlineKeyboard(
+                         roundList, OptionIDEnum.beginRound),
+                     parse_mode='HTML')
+
 
 def handleAdminBeginRound(update, context, round_no):
     global currentGame
@@ -157,10 +170,10 @@ def handleAdminBeginRound(update, context, round_no):
     adminText = f"""Thanks sir! Set Points phase for Round {currentGame.currentRound} has begun!!
 
 Make sure to type /adminEndSetPoints to begin the Killing Phase."""
-    bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
-                     text = adminText,
-                     message_id = update.callback_query.message.message_id,
-                     parse_mode = 'HTML')
+    bot.edit_message_text(chat_id=update.callback_query.message.chat.id,
+                          text=adminText,
+                          message_id=update.callback_query.message.message_id,
+                          parse_mode='HTML')
 
     blastText = f"""<b>NOTICE</b>
 Round {round_no} is about to begin!!
@@ -177,6 +190,7 @@ You are now in the <b>Set Points</b> phase
 
 Enjoy!"""
     blastMessageToAll(blastText)
+
 
 def adminEndSetPointsCmd(update, context):
     username = update.message.chat.username
@@ -199,11 +213,15 @@ Here are the points assigned for each faction.
 
 {pointsText}
 Are you okay with this?"""
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     reply_markup = makeInlineKeyboard(yesNoList, OptionIDEnum.endSetPoints),
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     reply_markup=makeInlineKeyboard(
+                         yesNoList, OptionIDEnum.endSetPoints),
+                     parse_mode='HTML')
 
+# TODO: Check if all points are above 5
+# If it is not, highlight the relevant faction with lesser than 5 points,
+# and their current points assigned
 def handleAdminEndSetPoints(update, context, yesNo):
     global currentGame
     chat_id = update.callback_query.message.chat.id
@@ -212,20 +230,20 @@ def handleAdminEndSetPoints(update, context, yesNo):
         # "No" was pressed
         adminText = f"""No worries, Set Points phase has not ended. Please ask the respective OGL to make amends.\n
 Once that is done, please type /adminEndSetPoints again.\n\n{dontWasteMyTimeText}"""
-        bot.edit_message_text(chat_id = chat_id,
-                     text = adminText,
-                     message_id = message_id,
-                     parse_mode = 'HTML')
+        bot.edit_message_text(chat_id=chat_id,
+                              text=adminText,
+                              message_id=message_id,
+                              parse_mode='HTML')
         return
 
     # "Yes" was pressed
     currentGame = adminCmd.endSetPoints(currentGame)
     print(f"Admin End Set Points Game State:\n{currentGame.toString()}")
     adminText = f"""You have ended Set Points phase for Round {currentGame.currentRound}! Killing has now been enabled :)"""
-    bot.edit_message_text(chat_id = chat_id,
-                    text = adminText,
-                    message_id = message_id,
-                    parse_mode = 'HTML')
+    bot.edit_message_text(chat_id=chat_id,
+                          text=adminText,
+                          message_id=message_id,
+                          parse_mode='HTML')
 
     for username, user in userTracker.items():
         # TODO Add in pic of play area
@@ -242,9 +260,10 @@ You are now in the <b>Killing</b> phase
 
 Stay safe while playing! Don't run on stairs + high areas and not into people. Remember that this is <b>just a game</b>\n
 Enjoy!"""
-        bot.send_message(chat_id = user["chat_id"],
-                     text = text,
-                     parse_mode = 'HTML')
+        bot.send_message(chat_id=user["chat_id"],
+                         text=text,
+                         parse_mode='HTML')
+
 
 def adminEndRoundCmd(update, context):
     username = update.message.chat.username
@@ -258,10 +277,12 @@ def adminEndRoundCmd(update, context):
 
     text = f"""You are about to end Round {currentGame.currentRound}!\n
 Are you sure you want to do this?"""
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = text,
-                     reply_markup = makeInlineKeyboard(yesNoList, OptionIDEnum.endRound),
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=text,
+                     reply_markup=makeInlineKeyboard(
+                         yesNoList, OptionIDEnum.endRound),
+                     parse_mode='HTML')
+
 
 def handleAdminEndRound(update, context, yesNo):
     global currentGame
@@ -270,10 +291,10 @@ def handleAdminEndRound(update, context, yesNo):
     if yesNo == yesNoList[1]:
         # "No" was pressed
         adminText = f"""No worries, Round {currentGame.currentRound} has not ended.\n\n{dontWasteMyTimeText}"""
-        bot.edit_message_text(chat_id = chat_id,
-                     text = adminText,
-                     message_id = message_id,
-                     parse_mode = 'HTML')
+        bot.edit_message_text(chat_id=chat_id,
+                              text=adminText,
+                              message_id=message_id,
+                              parse_mode='HTML')
         return
 
     # "Yes" was pressed
@@ -281,10 +302,10 @@ def handleAdminEndRound(update, context, yesNo):
     print(f"Admin End Round Game State:\n{currentGame.toString()}")
     adminText = f"""You have ended Round {currentGame.currentRound}!
 Please type /adminBeginRound to start another round."""
-    bot.edit_message_text(chat_id = chat_id,
-                    text = adminText,
-                    message_id = message_id,
-                    parse_mode = 'HTML')
+    bot.edit_message_text(chat_id=chat_id,
+                          text=adminText,
+                          message_id=message_id,
+                          parse_mode='HTML')
 
     blastText = f"""<b>NOTICE</b>
 Round {currentGame.currentRound} has ended!!
@@ -299,6 +320,8 @@ If there are no more round, hope you enjoyed the game and please gather at your 
 # TODO: SORT ALL VALUES
 # TODO: HERE NOW
 # TODO: Showing player text is too long, figure out if Casper needs it
+
+
 def adminFactionDetails(update, context):
     username = update.message.chat.username
     isAdmin = checkAdmin(update, context, username)
@@ -314,8 +337,10 @@ def adminFactionDetails(update, context):
     playerText = "\n\n"
     for playerFaction in factionsMap.keys():
         factionBank = userDb.getBank(playerFaction)
-        factionMembersPointsMap = userDb.getFactionMemberPoints(playerFaction, currentGame.currentRound)
-        factionKDArrMap = userDb.getFactionMemberKD(playerFaction, currentGame.currentRound)
+        factionMembersPointsMap = userDb.getFactionMemberPoints(
+            playerFaction, currentGame.currentRound)
+        factionKDArrMap = userDb.getFactionMemberKD(
+            playerFaction, currentGame.currentRound)
 
         totalPoints = 0
         totalKills = 0
@@ -334,7 +359,7 @@ def adminFactionDetails(update, context):
             totalDeaths += KDArr[1]
             killCountTxt += f"\n@{username}: {KDArr[0]}"
             deathCountTxt += f"\n@{username}: {KDArr[1]}"
-        
+
         bankText += f"\n- {factionsMap[str(playerFaction)]}: {factionBank}"
         totalPointsTxt += f"\n- {factionsMap[str(playerFaction)]}: {totalPoints}"
         totalKillsTxt += f"\n- {factionsMap[str(playerFaction)]}: {totalKills}"
@@ -343,9 +368,10 @@ def adminFactionDetails(update, context):
 -------END OF FACTION'S INDIV PLAYER DEETS-------\n\n"""
 
     summaryText += bankText + totalPointsTxt + totalKillsTxt + totalDeathsTxt
-    bot.send_message(chat_id = update.message.chat.id,
-        text = summaryText,
-        parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=summaryText,
+                     parse_mode='HTML')
+
 
 def adminAddPoints(update, context):
     username = update.message.chat.username
@@ -353,18 +379,20 @@ def adminAddPoints(update, context):
     if not isAdmin:
         return
     fullText = f"""You are about to <b>add points</b> for a faction
-    
+
 Please press the <b>ID of the faction</b> you are querying for.
 
 <b>Faction Legend:</b>"""
     for id, name in factionsMap.items():
         fullText += f"\nID {id}: {name}"
     fullText += f"\n\n Note: If pressed wrongly, just add 0 points bodoh."
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     reply_markup = makeInlineKeyboard(factionsMap.keys(), OptionIDEnum.adminAddPoints),
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     reply_markup=makeInlineKeyboard(
+                         factionsMap.keys(), OptionIDEnum.adminAddPoints),
+                     parse_mode='HTML')
     return
+
 
 def askAdminAddPoints(update, context, faction):
     username = update.callback_query.message.chat.username
@@ -382,10 +410,11 @@ def askAdminAddPoints(update, context, faction):
     fullText = f"""Please state the <b>number of points to add</b> for {factionsMap[str(faction)]} (ID: {faction})
 
 ~ Shan Royale 2022 Team"""
-    bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
-                     text = fullText,
-                     message_id = update.callback_query.message.message_id,
-                     parse_mode = 'HTML')
+    bot.edit_message_text(chat_id=update.callback_query.message.chat.id,
+                          text=fullText,
+                          message_id=update.callback_query.message.message_id,
+                          parse_mode='HTML')
+
 
 def handleAdminAddPoints(update, context, points):
     username = update.message.chat.username
@@ -398,17 +427,17 @@ def handleAdminAddPoints(update, context, points):
         points = int(points)
     except:
         txt = "<b>Wrong Input! Please type in an integer value only!</b>"
-        bot.send_message(chat_id = chat_id,
-            text = txt,
-            parse_mode = 'HTML')
+        bot.send_message(chat_id=chat_id,
+                         text=txt,
+                         parse_mode='HTML')
         return
 
     faction = adminQuery[username][OptionIDEnum.adminAddPoints]
     if faction not in factionsMap.keys():
         txt = f"<b>Faction specified is wrong!! (Value: {faction})</b>. Try /adminAddPoints again."
-        bot.send_message(chat_id = chat_id,
-            text = txt,
-            parse_mode = 'HTML')
+        bot.send_message(chat_id=chat_id,
+                         text=txt,
+                         parse_mode='HTML')
         return
 
     userDb = userTracker[username]["db"]
@@ -426,6 +455,7 @@ Current bank balance: {factionBankBalance}
     adminQuery[username][OptionIDEnum.adminAddPoints] = ""
     setState(username, None)
 
+
 def adminBroadcast(update, context):
     username = update.message.chat.username
     isAdmin = checkAdmin(update, context, username)
@@ -433,11 +463,12 @@ def adminBroadcast(update, context):
         return
     setState(username, StateEnum.adminBroadcast)
     fullText = f"""Please type in your message!
-    
+
 To cancel, type in /cancelBroadcast"""
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     parse_mode='HTML')
+
 
 def handleAdminBroadcast(update, context, text):
     username = update.message.chat.username
@@ -448,9 +479,9 @@ def handleAdminBroadcast(update, context, text):
     if text == "/cancelBroadcast":
         setState(username, None)
         fullText = f"Broadcast has been cancelled\n\n{dontWasteMyTimeText}"
-        bot.send_message(chat_id = userTracker[username]["chat_id"],
-            text = fullText,
-            parse_mode = 'HTML')
+        bot.send_message(chat_id=userTracker[username]["chat_id"],
+                         text=fullText,
+                         parse_mode='HTML')
         return
 
     # Store faction data
@@ -459,35 +490,37 @@ def handleAdminBroadcast(update, context, text):
     }
 
     fullText = f"Is this okay sir/maam?\n\n{text}'"
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     reply_markup = makeInlineKeyboard(yesNoList, OptionIDEnum.adminBroadcast),
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     reply_markup=makeInlineKeyboard(
+                         yesNoList, OptionIDEnum.adminBroadcast),
+                     parse_mode='HTML')
+
 
 def pumpAdminBroadcast(update, context, yesNo):
     username = update.callback_query.message.chat.username
-    chat_id =update.callback_query.message.chat.id
-    message_id =update.callback_query.message.message_id
+    chat_id = update.callback_query.message.chat.id
+    message_id = update.callback_query.message.message_id
     isAdmin = checkAdmin(update, context, username)
     if not isAdmin:
         return
 
     if yesNo == yesNoList[1]:
         # "No" was pressed
-        bot.edit_message_text(chat_id = chat_id,
-                     text = dontWasteMyTimeText,
-                     message_id = message_id,
-                     parse_mode = 'HTML')
+        bot.edit_message_text(chat_id=chat_id,
+                              text=dontWasteMyTimeText,
+                              message_id=message_id,
+                              parse_mode='HTML')
         return
     # "Yes" was pressed
     broadcastText = adminQuery[username][StateEnum.adminBroadcast]
     if broadcastText == "":
         fullText = "No text was detected. Try /adminBroadcast again."
-        bot.send_message(chat_id = chat_id,
-                     text = fullText,
-                     parse_mode = 'HTML')
+        bot.send_message(chat_id=chat_id,
+                         text=fullText,
+                         parse_mode='HTML')
         return
-    
+
     blastMessageToAll(broadcastText)
 
     # Store faction data
@@ -495,13 +528,15 @@ def pumpAdminBroadcast(update, context, yesNo):
     setState(username, None)
     return
 
-#===========================Safety Officer Comands===========================================
+# ===========================Safety Officer Comands===========================================
+
+
 def yellowCardCmd(update, context):
     username = update.message.chat.username
     isSafety = checkSafety(update, context, username)
     if not isSafety:
         return
-    
+
     setState(username, StateEnum.yellowCard)
 
     fullText = f"""<b>You are about to award someone a yellow card (1 Safety Breach)</b>
@@ -509,9 +544,10 @@ def yellowCardCmd(update, context):
 If you wish to <b>proceed</b>, type in the <b>telegram handle of the offender</b>
 
 If you wish to <b>cancel</b>, type in /cancelCard"""
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     parse_mode='HTML')
+
 
 def handleYellowCard(update, context, offenderUsername):
     print(f"HANDLING YELLOW CARD OF {offenderUsername}")
@@ -523,9 +559,9 @@ def handleYellowCard(update, context, offenderUsername):
     if offenderUsername == "/cancelCard":
         setState(username, None)
         fullText = f"Yellow/Red Card has been cancelled\n\n{dontWasteMyTimeText}"
-        bot.send_message(chat_id = userTracker[username]["chat_id"],
-            text = fullText,
-            parse_mode = 'HTML')
+        bot.send_message(chat_id=userTracker[username]["chat_id"],
+                         text=fullText,
+                         parse_mode='HTML')
         return
 
     valid = validUsername(update, context, offenderUsername)
@@ -533,28 +569,31 @@ def handleYellowCard(update, context, offenderUsername):
         return
 
     userDb = userTracker[username]["db"]
-    currentSafetyBreaches = userDb.getPlayerSafetyBreaches(offenderUsername, currentGame.currentRound)
+    currentSafetyBreaches = userDb.getPlayerSafetyBreaches(
+        offenderUsername, currentGame.currentRound)
     currentSafetyBreaches += 1
-    userDb.setPlayerSafetyBreaches(offenderUsername, currentGame.currentRound, currentSafetyBreaches)
+    userDb.setPlayerSafetyBreaches(
+        offenderUsername, currentGame.currentRound, currentSafetyBreaches)
 
     fullText = f"""@{offenderUsername} has been given a yellow Card, and now has {currentSafetyBreaches} safety breaches!
 
 2 Safety Breaches, and you are out!"""
-    bot.send_message(chat_id = update.message.chat.id,
-        text = fullText,
-        parse_mode = 'HTML')
-    bot.send_message(chat_id = userTracker[offenderUsername]["chat_id"],
-        text = fullText,
-        parse_mode = 'HTML')
-    
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     parse_mode='HTML')
+    bot.send_message(chat_id=userTracker[offenderUsername]["chat_id"],
+                     text=fullText,
+                     parse_mode='HTML')
+
     setState(username, None)
+
 
 def redCardCmd(update, context):
     username = update.message.chat.username
     isSafety = checkSafety(update, context, username)
     if not isSafety:
         return
-    
+
     setState(username, StateEnum.redCard)
 
     fullText = f"""<b>You are about to award someone a red card (2 Safety Breaches)</b>
@@ -562,9 +601,10 @@ def redCardCmd(update, context):
 If you wish to <b>proceed</b>, type in the <b>telegram handle of the offender</b>
 
 If you wish to <b>cancel</b>, type in /cancelCard"""
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     parse_mode='HTML')
+
 
 def handleRedCard(update, context, offenderUsername):
     print(f"HANDLING RED CARD OF {offenderUsername}")
@@ -576,9 +616,9 @@ def handleRedCard(update, context, offenderUsername):
     if offenderUsername == "/cancelCard":
         setState(username, None)
         fullText = f"Yellow/Red Card has been cancelled\n\n{dontWasteMyTimeText}"
-        bot.send_message(chat_id = userTracker[username]["chat_id"],
-            text = fullText,
-            parse_mode = 'HTML')
+        bot.send_message(chat_id=userTracker[username]["chat_id"],
+                         text=fullText,
+                         parse_mode='HTML')
         return
 
     valid = validUsername(update, context, offenderUsername)
@@ -586,20 +626,22 @@ def handleRedCard(update, context, offenderUsername):
         return
 
     userDb = userTracker[username]["db"]
-    currentSafetyBreaches = userDb.getPlayerSafetyBreaches(offenderUsername, currentGame.currentRound)
+    currentSafetyBreaches = userDb.getPlayerSafetyBreaches(
+        offenderUsername, currentGame.currentRound)
     currentSafetyBreaches += 2
-    userDb.setPlayerSafetyBreaches(offenderUsername, currentGame.currentRound, currentSafetyBreaches)
+    userDb.setPlayerSafetyBreaches(
+        offenderUsername, currentGame.currentRound, currentSafetyBreaches)
 
     fullText = f"""@{offenderUsername} has been given a Red Card, and now has {currentSafetyBreaches} safety breaches!
 
 2 Safety Breaches, and you are out!"""
-    bot.send_message(chat_id = update.message.chat.id,
-        text = fullText,
-        parse_mode = 'HTML')
-    bot.send_message(chat_id = userTracker[offenderUsername]["chat_id"],
-        text = fullText,
-        parse_mode = 'HTML')
-    
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     parse_mode='HTML')
+    bot.send_message(chat_id=userTracker[offenderUsername]["chat_id"],
+                     text=fullText,
+                     parse_mode='HTML')
+
     setState(username, None)
 
 #========================Player Command Handlers===============================================
@@ -612,17 +654,17 @@ def startCmd(update, context):
     if not userExists:
         errorText = """Your username is <b>NOT in the database</b>. If you have changed your username after registering for TSE, please change your username back and try /start again.\n\n
 Please contact @praveeeenk if the problem persists."""
-        bot.send_message(chat_id = update.message.chat.id,
-                     text = errorText,
-                     parse_mode = 'HTML')
+        bot.send_message(chat_id=update.message.chat.id,
+                         text=errorText,
+                         parse_mode='HTML')
         return
-    
+
     txt1 = "Hi! Welcome to the Shan Royale Bot\n"
     txt2 = "Type <b>/help</b> for more info\n\n"
     txt3 = "Registered username: " + username + "\n\n"
     txt4 = "IMPT: Please <b>do NOT change your username</b> after starting the bot"
     fullText = txt1 + txt2 + txt3 + txt4
-    update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
+    update.message.reply_text(text=fullText, parse_mode=ParseMode.HTML)
 
     # Add new user to userTracker
     if username not in userTracker.keys():
@@ -633,29 +675,8 @@ Please contact @praveeeenk if the problem persists."""
             "elimination_target": ""
         }
         userTracker[username] = newUserTracker
-        # vigTracker = {
-        #     'state': None,
-        #     'db': DBHelper(),
-        #     'chat_id': "258884638",
-        #     "elimination_target": ""
-        # }
-        # userTracker["vigonometry"] = vigTracker
-        # danTracker = {
-        #     'state': None,
-        #     'db': DBHelper(),
-        #     'chat_id': "258884638",
-        #     "elimination_target": ""
-        # }
-        # userTracker["ddannyiel"] = danTracker
-        # casperTracker = {
-        #     'state': None,
-        #     'db': DBHelper(),
-        #     'chat_id': "355739375",
-        #     "elimination_target": ""
-        # }
-        # userTracker["Casperplz"] = casperTracker
-
     print("User Tracker: " + str(userTracker))
+
 
 def helpCmd(update, context):
     playerCmds = """<b>Here are the suppported player commands:</b>\n
@@ -707,16 +728,17 @@ def helpCmd(update, context):
     
     if username in gameMasters:
         fullText += "\n\n" + gamemasterCmds + "\n\n" + safetyCmds + "\n\n" + playerCmds
-        update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
+        update.message.reply_text(text=fullText, parse_mode=ParseMode.HTML)
         return
     
     if username in safetyOfficers:
         fullText += "\n\n" + safetyCmds + "\n\n" + playerCmds
-        update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
+        update.message.reply_text(text=fullText, parse_mode=ParseMode.HTML)
         return
 
     fullText += "\n\n" + playerCmds
-    update.message.reply_text(text = fullText, parse_mode = ParseMode.HTML)
+    update.message.reply_text(text=fullText, parse_mode=ParseMode.HTML)
+
 
 def error(update, context):
     """Log Errors caused by Updates."""
@@ -758,9 +780,12 @@ def factionCmd(update, context):
         deathCountTxt += f"\n@{username}: {death}"
     fullText = header + bankTxt + pointsTxt + killCountTxt + deathCountTxt
 
-    bot.send_message(chat_id = update.message.chat.id,
-        text = fullText,
-        parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     parse_mode='HTML')
+
+# TODO: SORT BANKS IF POSSIBLE
+
 
 def listBanksCmd(update, context):
     safe = checkSafetyBreaches(update, context)
@@ -810,9 +835,12 @@ Take Note:<em>
 - <b>Do not exceed</b> your total team points of 200!
 </em>
 """
-    bot.send_message(chat_id = update.message.chat.id,
-        text = fullText,
-        parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     parse_mode='HTML')
+
+# TODO: SHOW CURRENT POINTS ASSIGNED
+
 
 def handleSetPoints(update, context, text):
     chat_id = update.message.chat.id
@@ -822,7 +850,7 @@ def handleSetPoints(update, context, text):
     if not setPointsPhase:
         setState(username, None)
         return
-    
+
     safe = checkSafetyBreaches(update, context)
     if not safe:
         return
@@ -844,11 +872,12 @@ Points Assigned Faction-wide so far: {updatedFactionPoints}pts
 
 Click <b>/setpoints</b> again to <b>reset</b> points for this round!
 """
-    bot.send_message(chat_id = chat_id,
-        text = fullText,
-        parse_mode = 'HTML')
-    
+    bot.send_message(chat_id=chat_id,
+                     text=fullText,
+                     parse_mode='HTML')
+
     setState(username, None)
+
 
 def listPointsCmd(update, context):
     playPhase = checkPlayPhase(update, context)
@@ -876,18 +905,21 @@ def listPointsCmd(update, context):
     header = f"<b>{factionsMap[str(playerFaction)]} Points Summary</b>\n\n<b>Total: {totalPoints}pts</b>\n\n"
     fullText = header + txt1 + txt2
 
-    bot.send_message(chat_id = update.message.chat.id,
-        text = fullText,
-        parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     parse_mode='HTML')
+
+# TODO ADD CHECKS FOR TEAM POINTS TOO!
+
 
 def invalidPoints(chat_id, text, currentFactionPoints):
     try:
         points = int(text)
     except:
         txt = "<b>Wrong Input! Please type in a value from 5 - 200 only!</b>"
-        bot.send_message(chat_id = chat_id,
-            text = txt,
-            parse_mode = 'HTML')
+        bot.send_message(chat_id=chat_id,
+                         text=txt,
+                         parse_mode='HTML')
         return True
 
     if points < minPoints:
@@ -913,7 +945,9 @@ Please enter your points for this round again."""
     
     return False
 
-#=========================Killing Mechanism================================
+# =========================Killing Mechanism================================
+
+
 def dyingCmd(update, context):
     killingPhase = checkKillingPhase(update, context)
     if not killingPhase:
@@ -925,14 +959,16 @@ def dyingCmd(update, context):
     immune = checkImmunity(update, context, username)
     if immune:
         return
-    
+
     fullText = f"""/dying should only be entered <b>once you have been "killed" in person by someone else.</b>
 
 Press yes if you wish to proceed."""
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     reply_markup = makeInlineKeyboard(yesNoList, OptionIDEnum.dying),
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     reply_markup=makeInlineKeyboard(
+                         yesNoList, OptionIDEnum.dying),
+                     parse_mode='HTML')
+
 
 def handleDying(update, context, yesNo):
     chat_id = update.callback_query.message.chat.id
@@ -950,10 +986,10 @@ def handleDying(update, context, yesNo):
         return
     if yesNo == yesNoList[1]:
         # "No" was pressed
-        bot.edit_message_text(chat_id = chat_id,
-                     text = dontWasteMyTimeText,
-                     message_id = message_id,
-                     parse_mode = 'HTML')
+        bot.edit_message_text(chat_id=chat_id,
+                              text=dontWasteMyTimeText,
+                              message_id=message_id,
+                              parse_mode='HTML')
         return
     # "Yes" was pressed
     userDb = userTracker[username]["db"]
@@ -962,10 +998,11 @@ def handleDying(update, context, yesNo):
     fullText = f"""<b>You have registered yourself as dying.</b> The killer must now /kill to confirm the kill.
 
 You will be informed on the changes in points once the kill is validated."""
-    bot.edit_message_text(chat_id = chat_id,
-                    text = fullText,
-                    message_id = message_id,
-                    parse_mode = 'HTML')
+    bot.edit_message_text(chat_id=chat_id,
+                          text=fullText,
+                          message_id=message_id,
+                          parse_mode='HTML')
+
 
 def killCmd(update, context):
     killingPhase = checkKillingPhase(update, context)
@@ -978,7 +1015,7 @@ def killCmd(update, context):
     immune = checkImmunity(update, context, username)
     if immune:
         return
-    
+
     setState(username, StateEnum.kill)
 
     fullText = f"""/kill should only be entered <b>once you have "killed" someone else in person.</b>
@@ -986,9 +1023,10 @@ def killCmd(update, context):
 If you wish to <b>proceed</b>, type in the <b>telegram handle of the victim</b>
 
 If you wish to <b>cancel</b>, type in /cancelkill"""
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     parse_mode='HTML')
+
 
 def handleKill(update, context, victimUsername):
     print(f"HANDLING KILL OF {victimUsername}")
@@ -1004,9 +1042,9 @@ def handleKill(update, context, victimUsername):
     if victimUsername == "/cancelkill":
         setState(username, None)
         fullText = f"Kill has been cancelled\n\n{dontWasteMyTimeText}"
-        bot.send_message(chat_id = userTracker[username]["chat_id"],
-            text = fullText,
-            parse_mode = 'HTML')
+        bot.send_message(chat_id=userTracker[username]["chat_id"],
+                         text=fullText,
+                         parse_mode='HTML')
         return
 
     valid = validUsername(update, context, victimUsername)
@@ -1023,8 +1061,9 @@ def handleKill(update, context, victimUsername):
         rightKill(update, context, username, victimUsername)
     else:
         wrongKill(update, context, username, victimUsername)
-    
+
     setState(username, None)
+
 
 def stickCmd(update, context):
     killingPhase = checkKillingPhase(update, context)
@@ -1040,7 +1079,7 @@ def stickCmd(update, context):
     stick = checkStick(update, context, username)
     if not stick:
         return
-    
+
     setState(username, StateEnum.kill)
 
     fullText = f"""You are about to use your stick to initiate a kill.
@@ -1050,46 +1089,52 @@ def stickCmd(update, context):
 If you wish to <b>proceed</b>, type in the <b>telegram handle of the victim</b>
 
 If you wish to <b>cancel</b>, type in /cancelkill"""
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     parse_mode='HTML')
+
 
 def checkImmunity(update, context, username):
     userDb = userTracker[username]["db"]
     currentTime = time.time()
-    playerImmunityExpiry = userDb.getImmunityExpiry(username, currentGame.currentRound)
+    playerImmunityExpiry = userDb.getImmunityExpiry(
+        username, currentGame.currentRound)
     remainingTime = playerImmunityExpiry - currentTime
     if remainingTime > 0:
         fullText = f"You are still immune for {remainingTime} seconds!\n\nYou may not be killed or kill!"
-        bot.send_message(chat_id = userTracker[username]["chat_id"],
-                     text = fullText,
-                     parse_mode = 'HTML')
+        bot.send_message(chat_id=userTracker[username]["chat_id"],
+                         text=fullText,
+                         parse_mode='HTML')
         return True
     return False
+
 
 def checkStick(update, context, username):
     userDb = userTracker[username]["db"]
     currentTime = time.time()
-    playerStickExpiry = userDb.getStickExpiry(username, currentGame.currentRound)
+    playerStickExpiry = userDb.getStickExpiry(
+        username, currentGame.currentRound)
     expiredForTime = currentTime - playerStickExpiry
     if expiredForTime > 0:
         fullText = f"Your stick <b>expired at {datetime.fromtimestamp(playerStickExpiry)}</b>!\n\n(If the time seems inaccurate, its because it may be in GMT+0. If so, add 8 hours to the stated time.)"
-        bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     parse_mode = 'HTML')
+        bot.send_message(chat_id=update.message.chat.id,
+                         text=fullText,
+                         parse_mode='HTML')
         return False
     return True
+
 
 def validUsername(update, context, username):
     chat_id = update.message.chat.id
     if not username in userTracker.keys():
         txt = "The victim has not started the game! <b>Ask them to press /start</b>"
-        bot.send_message(chat_id = chat_id,
-            text = txt,
-            parse_mode = 'HTML')
+        bot.send_message(chat_id=chat_id,
+                         text=txt,
+                         parse_mode='HTML')
         return False
 
     return True
+
 
 def checkVictimDying(update, context, username):
     userDb = userTracker[username]["db"]
@@ -1099,36 +1144,42 @@ def checkVictimDying(update, context, username):
         fullText = f"""Victim has not declared themselves dying!
 
 <b>Ask the victim to enter /dying</b> on their phone first! After which, you may type <b>/kill</b> again."""
-        bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     parse_mode = 'HTML')
+        bot.send_message(chat_id=update.message.chat.id,
+                         text=fullText,
+                         parse_mode='HTML')
         return False
     return True
+
 
 def checkVictimInPreyFaction(killerUsername, victimUsername):
     userDb = userTracker[killerUsername]["db"]
     killerTargetFaction = getTargetFaction(killerUsername)
-    victimFaction = userDb.getPlayerFaction(victimUsername, currentGame.currentRound)
+    victimFaction = userDb.getPlayerFaction(
+        victimUsername, currentGame.currentRound)
     if int(killerTargetFaction) == int(victimFaction):
         return True
     return False
 
+
 def rightKill(update, context, killerUsername, victimUsername):
     userDb = userTracker[killerUsername]["db"]
-    killerData = userDb.getPlayerDataJSON(killerUsername, currentGame.currentRound)
-    victimData = userDb.getPlayerDataJSON(victimUsername, currentGame.currentRound)
+    killerData = userDb.getPlayerDataJSON(
+        killerUsername, currentGame.currentRound)
+    victimData = userDb.getPlayerDataJSON(
+        victimUsername, currentGame.currentRound)
 
     killerFaction = killerData[playerDataKeys.faction]
     victimFaction = victimData[playerDataKeys.faction]
     killerFactionData = userDb.getFactionDataJSON(killerFaction)
-    
+
     # Update faction data
     pointsToAdd = victimData[playerDataKeys.points]
     killerFactionData[factionDataKeys.bank] += pointsToAdd
     userDb.replaceFactionDataFromJSON(killerFactionData)
 
     # Update victim data
-    victimData[playerDataKeys.immunityExpiry] = time.time() + immuneSecondsUponDeath
+    victimData[playerDataKeys.immunityExpiry] = time.time() + \
+                                                          immuneSecondsUponDeath
     victimData[playerDataKeys.points] = 5
     victimData[playerDataKeys.dying] = 0
     victimData[playerDataKeys.deathCount] += 1
@@ -1147,14 +1198,15 @@ Points added to faction bank: <b>{pointsToAdd}pts</b>
 Current faction bank balance: <b>{killerFactionData[factionDataKeys.bank]}pts</b>
 
 <b>Note:</b> The victim, {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}), is now <b>immune from kills</b> for the next {immuneSecondsUponDeath}s."""
-    killerFactionMembers = userDb.getFactionMemberUsernames(killerFaction, currentGame.currentRound)
+    killerFactionMembers = userDb.getFactionMemberUsernames(
+        killerFaction, currentGame.currentRound)
     for username in killerFactionMembers:
         if username not in userTracker.keys():
             continue
         chat_id = userTracker[username]["chat_id"]
-        bot.send_message(chat_id = chat_id,
-            text = killerFactionText,
-            parse_mode = 'HTML')
+        bot.send_message(chat_id=chat_id,
+                         text=killerFactionText,
+                         parse_mode='HTML')
 
     # Blast message to victim's faction
     victimFactionText = f"""<b>{factionsMap[str(victimFaction)]} Faction Update</b>
@@ -1162,21 +1214,27 @@ Current faction bank balance: <b>{killerFactionData[factionDataKeys.bank]}pts</b
 {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}) has been <b>killed</b>! Their points have been <b>reset to {minPoints}</b>.
 
 <b>Note:</b> The victim, {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}), is now <b>immune from kills</b> for the next {immuneSecondsUponDeath}s."""
-    victimFactionMembers = userDb.getFactionMemberUsernames(victimFaction, currentGame.currentRound)
+    victimFactionMembers = userDb.getFactionMemberUsernames(
+        victimFaction, currentGame.currentRound)
     for username in victimFactionMembers:
         if username not in userTracker.keys():
             continue
         chat_id = userTracker[username]["chat_id"]
-        bot.send_message(chat_id = chat_id,
-            text = victimFactionText,
-            parse_mode = 'HTML')
+        bot.send_message(chat_id=chat_id,
+                         text=victimFactionText,
+                         parse_mode='HTML')
+
 
 def wrongKill(update, context, killerUsername, victimUsername):
     userDb = userTracker[killerUsername]["db"]
-    killerFullname = userDb.getFullname(killerUsername, currentGame.currentRound)
-    victimFullname = userDb.getFullname(victimUsername, currentGame.currentRound)
-    killerFaction = userDb.getPlayerFaction(killerUsername, currentGame.currentRound)
-    victimFaction = userDb.getPlayerFaction(victimUsername, currentGame.currentRound)
+    killerFullname = userDb.getFullname(
+        killerUsername, currentGame.currentRound)
+    victimFullname = userDb.getFullname(
+        victimUsername, currentGame.currentRound)
+    killerFaction = userDb.getPlayerFaction(
+        killerUsername, currentGame.currentRound)
+    victimFaction = userDb.getPlayerFaction(
+        victimUsername, currentGame.currentRound)
 
     if killerFaction == victimFaction:
         txt = f"""<b>{factionsMap[str(killerFaction)]} Faction Update</b>
@@ -1186,16 +1244,17 @@ Ummmmmm...
 {killerFullname} (@{killerUsername}) tried to <b>wrongly kill</b> their faction mate, {victimFullname} (@{victimUsername})!
 
 Please settle your internal rivalry guys..."""
-        killerFactionMembers = userDb.getFactionMemberUsernames(killerFaction, currentGame.currentRound)
+        killerFactionMembers = userDb.getFactionMemberUsernames(
+            killerFaction, currentGame.currentRound)
         for username in killerFactionMembers:
             if username not in userTracker.keys():
                 continue
             chat_id = userTracker[username]["chat_id"]
-            bot.send_message(chat_id = chat_id,
-                text = txt,
-                parse_mode = 'HTML')
+            bot.send_message(chat_id=chat_id,
+                             text=txt,
+                             parse_mode='HTML')
         return
-    
+
     # Update faction banks
     killerBankBalance = userDb.getBank(killerFaction)
     victimBankBalance = userDb.getBank(victimFaction)
@@ -1218,14 +1277,15 @@ Thus, <b>{wrongKillPenalty}pts</b> have been transferred from your faction bank 
 Current faction bank balance: <b>{killerBankBalance}pts</b>
 
 Don't noob and anyhow kill can?"""
-    killerFactionMembers = userDb.getFactionMemberUsernames(killerFaction, currentGame.currentRound)
+    killerFactionMembers = userDb.getFactionMemberUsernames(
+        killerFaction, currentGame.currentRound)
     for username in killerFactionMembers:
         if username not in userTracker.keys():
             continue
         chat_id = userTracker[username]["chat_id"]
-        bot.send_message(chat_id = chat_id,
-            text = killerFactionText,
-            parse_mode = 'HTML')
+        bot.send_message(chat_id=chat_id,
+                         text=killerFactionText,
+                         parse_mode='HTML')
 
     # Blast message to victim's faction
     victimFactionText = f"""<b>{factionsMap[str(victimFaction)]} Faction Update</b>
@@ -1236,16 +1296,19 @@ Thus, <b>{wrongKillPenalty}pts</b> have been transferred from the killer's facti
 Current faction bank balance: <b>{victimBankBalance}pts</b>
 
 <b>Note:</b> The victim, {victimFullname} (@{victimUsername}), is NOT given immunity from kills."""
-    victimFactionMembers = userDb.getFactionMemberUsernames(victimFaction, currentGame.currentRound)
+    victimFactionMembers = userDb.getFactionMemberUsernames(
+        victimFaction, currentGame.currentRound)
     for username in victimFactionMembers:
         if username not in userTracker.keys():
             continue
         chat_id = userTracker[username]["chat_id"]
-        bot.send_message(chat_id = chat_id,
-            text = victimFactionText,
-            parse_mode = 'HTML')
+        bot.send_message(chat_id=chat_id,
+                         text=victimFactionText,
+                         parse_mode='HTML')
 
-#=========================Spystation Mechanism================================
+# =========================Spystation Mechanism================================
+
+
 def visitSpyStationCmd(update, context):
     killingPhase = checkKillingPhase(update, context)
     if not killingPhase:
@@ -1257,16 +1320,18 @@ def visitSpyStationCmd(update, context):
     visited = visitedSpyStation(update, context, username)
     if visited:
         return
-    
+
     fullText = f"""/visitSpyStation should only be entered <b>once you are going to engage with the game master at the spy station</b>
 
 You may only visit the spy station <b>once per round</b>.
 
 Are you sure you are visiting the spy station?"""
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     reply_markup = makeInlineKeyboard(yesNoList, OptionIDEnum.visitSpyStation),
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     reply_markup=makeInlineKeyboard(
+                         yesNoList, OptionIDEnum.visitSpyStation),
+                     parse_mode='HTML')
+
 
 def handleVisitSpyStation(update, context, yesNo):
     killingPhase = checkKillingPhase(update, context, callback=True)
@@ -1280,10 +1345,10 @@ def handleVisitSpyStation(update, context, yesNo):
     message_id = update.callback_query.message.message_id
     if yesNo == yesNoList[1]:
         # "No" was pressed
-        bot.edit_message_text(chat_id = chat_id,
-                     text = dontWasteMyTimeText,
-                     message_id = message_id,
-                     parse_mode = 'HTML')
+        bot.edit_message_text(chat_id=chat_id,
+                              text=dontWasteMyTimeText,
+                              message_id=message_id,
+                              parse_mode='HTML')
         return
     # "Yes" was pressed
     username = update.callback_query.message.chat.username
@@ -1294,26 +1359,30 @@ def handleVisitSpyStation(update, context, yesNo):
     fullText = f"""<b>You (@{username}) have registered yourself at the Spy Station</b>
 
 Faction Name (ID): {factionsMap[str(playerFaction)]} ({playerFaction})
-    
+
 Show this pass to the game master to proceed with the station activities."""
-    bot.edit_message_text(chat_id = chat_id,
-                    text = fullText,
-                    message_id = message_id,
-                    parse_mode = 'HTML')
-    
+    bot.edit_message_text(chat_id=chat_id,
+                          text=fullText,
+                          message_id=message_id,
+                          parse_mode='HTML')
+
+
 def visitedSpyStation(update, context, username):
     userDb = userTracker[username]["db"]
-    visitedSpyStation = userDb.getPlayerVisitSpyStation(username, currentGame.currentRound)
+    visitedSpyStation = userDb.getPlayerVisitSpyStation(
+        username, currentGame.currentRound)
 
     if visitedSpyStation:
         fullText = f"""You have visited the spy station in this round!\n\n{dontWasteMyTimeText}"""
-        bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     parse_mode = 'HTML')
+        bot.send_message(chat_id=update.message.chat.id,
+                         text=fullText,
+                         parse_mode='HTML')
         return True
     return False
 
-#========================Spy Master Commands==================================
+# ========================Spy Master Commands==================================
+
+
 def tier1aCmd(update, context):
     killingPhase = checkKillingPhase(update, context)
     if not killingPhase:
@@ -1322,18 +1391,20 @@ def tier1aCmd(update, context):
     gameMaster = checkGameMaster(update, context, username)
     if not gameMaster:
         return
-    
+
     fullText = f"""You are querying for <b>1 Faction that is NOT the predator faction</b> of the requested faction
-    
+
 Please state the <b>ID of the faction</b> you are querying for.
 
 <b>Faction Legend:</b>"""
     for id, name in factionsMap.items():
         fullText += f"\nID {id}: {name}"
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     reply_markup = makeInlineKeyboard(factionsMap.keys(), OptionIDEnum.tier1a),
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     reply_markup=makeInlineKeyboard(
+                         factionsMap.keys(), OptionIDEnum.tier1a),
+                     parse_mode='HTML')
+
 
 def handleTier1a(update, context, faction):
     killingPhase = checkKillingPhase(update, context, callback=True)
@@ -1345,7 +1416,8 @@ def handleTier1a(update, context, faction):
         return
 
     userDb = userTracker[username]["db"]
-    predatorFaction = userDb.getPredatorFaction(faction, currentGame.currentRound)
+    predatorFaction = userDb.getPredatorFaction(
+        faction, currentGame.currentRound)
     nonPredatorFactions = []
     for factionID in factionsMap.keys():
         if factionID == str(faction) or factionID == str(predatorFaction):
@@ -1357,10 +1429,11 @@ def handleTier1a(update, context, faction):
     gameMasterText = f"""{factionsMap[selectedFaction]} (ID: {selectedFaction}) is <b>not</b> the predator faction of {factionsMap[faction]}!
 
 ~ Shan Royale 2022 Team"""
-    bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
-                     text = gameMasterText,
-                     message_id = update.callback_query.message.message_id,
-                     parse_mode = 'HTML')
+    bot.edit_message_text(chat_id=update.callback_query.message.chat.id,
+                          text=gameMasterText,
+                          message_id=update.callback_query.message.message_id,
+                          parse_mode='HTML')
+
 
 def tier1bCmd(update, context):
     killingPhase = checkKillingPhase(update, context)
@@ -1370,18 +1443,20 @@ def tier1bCmd(update, context):
     gameMaster = checkGameMaster(update, context, username)
     if not gameMaster:
         return
-    
+
     fullText = f"""You are querying for <b>{tier1bNumToSelect} people from the prey faction</b> of the requested faction, who <b>do not</b> possess the most number of points.
-    
+
 Please state the <b>ID of the faction</b> you are querying for.
 
 <b>Faction Legend:</b>"""
     for id, name in factionsMap.items():
         fullText += f"\nID {id}: {name}"
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     reply_markup = makeInlineKeyboard(factionsMap.keys(), OptionIDEnum.tier1b),
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     reply_markup=makeInlineKeyboard(
+                         factionsMap.keys(), OptionIDEnum.tier1b),
+                     parse_mode='HTML')
+
 
 def handleTier1b(update, context, faction):
     killingPhase = checkKillingPhase(update, context, callback=True)
@@ -1393,11 +1468,14 @@ def handleTier1b(update, context, faction):
         return
 
     userDb = userTracker[username]["db"]
-    preyFaction = userDb.getTargetFactionFromFaction(faction, currentGame.currentRound)
-    preyMemberPointsMap = userDb.getFactionMemberPoints(preyFaction, currentGame.currentRound)
-    sortedArr = sorted(preyMemberPointsMap.items(), key=lambda memberPoints: memberPoints[1], reverse=True)
+    preyFaction = userDb.getTargetFactionFromFaction(
+        faction, currentGame.currentRound)
+    preyMemberPointsMap = userDb.getFactionMemberPoints(
+        preyFaction, currentGame.currentRound)
+    sortedArr = sorted(preyMemberPointsMap.items(),
+                       key=lambda memberPoints: memberPoints[1], reverse=True)
     print(f"Tier 1b Prey Faction Arr: {sortedArr}")
-    
+
     numPreyLeft = len(sortedArr) - tier1bTopCut
     if numPreyLeft <= 0:
         print("ERROR: TOO LITTLE PREY LEFT ")
@@ -1407,9 +1485,9 @@ def handleTier1b(update, context, faction):
         numPreyToSelect = tier1bNumToSelect
     else:
         numPreyToSelect = numPreyLeft
-    
+
     # RAndom num avoids top ppl specified by tier1bTopCut
-    #TODO: If num left < tier1bTopCut, this results in a loop
+    # TODO: If num left < tier1bTopCut, this results in a loop
     randomNumArray = []
     for i in range(numPreyToSelect):
         random_num = random.randint(tier1bTopCut, numPreyToSelect)
@@ -1427,10 +1505,11 @@ def handleTier1b(update, context, faction):
 
 {pointsTxt}
 ~ Shan Royale 2022 Team"""
-    bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
-                     text = gameMasterText,
-                     message_id = update.callback_query.message.message_id,
-                     parse_mode = 'HTML')
+    bot.edit_message_text(chat_id=update.callback_query.message.chat.id,
+                          text=gameMasterText,
+                          message_id=update.callback_query.message.message_id,
+                          parse_mode='HTML')
+
 
 def tier2aCmd(update, context):
     killingPhase = checkKillingPhase(update, context)
@@ -1440,18 +1519,20 @@ def tier2aCmd(update, context):
     gameMaster = checkGameMaster(update, context, username)
     if not gameMaster:
         return
-    
+
     fullText = f"""You are querying for <b>the predator faction</b> of the requested faction
-    
+
 Please state the <b>ID of the faction</b> you are querying for.
 
 <b>Faction Legend:</b>"""
     for id, name in factionsMap.items():
         fullText += f"\nID {id}: {name}"
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     reply_markup = makeInlineKeyboard(factionsMap.keys(), OptionIDEnum.tier2a),
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     reply_markup=makeInlineKeyboard(
+                         factionsMap.keys(), OptionIDEnum.tier2a),
+                     parse_mode='HTML')
+
 
 def handleTier2a(update, context, faction):
     killingPhase = checkKillingPhase(update, context, callback=True)
@@ -1463,15 +1544,17 @@ def handleTier2a(update, context, faction):
         return
 
     userDb = userTracker[username]["db"]
-    predatorFaction = userDb.getPredatorFaction(faction, currentGame.currentRound)
+    predatorFaction = userDb.getPredatorFaction(
+        faction, currentGame.currentRound)
 
     gameMasterText = f"""<b>{factionsMap[str(predatorFaction)]} (ID: {predatorFaction})</b> is the predator faction of {factionsMap[str(faction)]}!
 
 ~ Shan Royale 2022 Team"""
-    bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
-                     text = gameMasterText,
-                     message_id = update.callback_query.message.message_id,
-                     parse_mode = 'HTML')
+    bot.edit_message_text(chat_id=update.callback_query.message.chat.id,
+                          text=gameMasterText,
+                          message_id=update.callback_query.message.message_id,
+                          parse_mode='HTML')
+
 
 def tier2bCmd(update, context):
     killingPhase = checkKillingPhase(update, context)
@@ -1481,18 +1564,20 @@ def tier2bCmd(update, context):
     gameMaster = checkGameMaster(update, context, username)
     if not gameMaster:
         return
-    
+
     fullText = f"""You are querying for <b>{tier2bNumToSelect} people from the prey faction</b> of the requested faction, who <b>do not</b> possess the most number of points.
-    
+
 Please state the <b>ID of the faction</b> you are querying for.
 
 <b>Faction Legend:</b>"""
     for id, name in factionsMap.items():
         fullText += f"\nID {id}: {name}"
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     reply_markup = makeInlineKeyboard(factionsMap.keys(), OptionIDEnum.tier2b),
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     reply_markup=makeInlineKeyboard(
+                         factionsMap.keys(), OptionIDEnum.tier2b),
+                     parse_mode='HTML')
+
 
 def handleTier2b(update, context, faction):
     killingPhase = checkKillingPhase(update, context, callback=True)
@@ -1504,11 +1589,14 @@ def handleTier2b(update, context, faction):
         return
 
     userDb = userTracker[username]["db"]
-    preyFaction = userDb.getTargetFactionFromFaction(faction, currentGame.currentRound)
-    preyMemberPointsMap = userDb.getFactionMemberPoints(preyFaction, currentGame.currentRound)
-    sortedArr = sorted(preyMemberPointsMap.items(), key=lambda memberPoints: memberPoints[1], reverse=True)
+    preyFaction = userDb.getTargetFactionFromFaction(
+        faction, currentGame.currentRound)
+    preyMemberPointsMap = userDb.getFactionMemberPoints(
+        preyFaction, currentGame.currentRound)
+    sortedArr = sorted(preyMemberPointsMap.items(),
+                       key=lambda memberPoints: memberPoints[1], reverse=True)
     print(f"Tier 2b Prey Faction Arr: {sortedArr}")
-    
+
     numPreyLeft = len(sortedArr) - tier2bTopCut
     if numPreyLeft <= 0:
         print("ERROR: TOO LITTLE PREY LEFT ")
@@ -1518,9 +1606,9 @@ def handleTier2b(update, context, faction):
         numPreyToSelect = tier2bNumToSelect
     else:
         numPreyToSelect = numPreyLeft
-    
+
     # RAndom num avoids top ppl specified by tier2bTopCut
-    #TODO: If num left < tier1bTopCut, this results in a loop
+    # TODO: If num left < tier1bTopCut, this results in a loop
     randomNumArray = []
     for i in range(numPreyToSelect):
         random_num = random.randint(tier2bTopCut, numPreyToSelect)
@@ -1538,10 +1626,11 @@ def handleTier2b(update, context, faction):
 
 {pointsTxt}
 ~ Shan Royale 2022 Team"""
-    bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
-                     text = gameMasterText,
-                     message_id = update.callback_query.message.message_id,
-                     parse_mode = 'HTML')
+    bot.edit_message_text(chat_id=update.callback_query.message.chat.id,
+                          text=gameMasterText,
+                          message_id=update.callback_query.message.message_id,
+                          parse_mode='HTML')
+
 
 def tier3aCmd(update, context):
     killingPhase = checkKillingPhase(update, context)
@@ -1551,20 +1640,22 @@ def tier3aCmd(update, context):
     gameMaster = checkGameMaster(update, context, username)
     if not gameMaster:
         return
-    
+
     fullText = f"""You are querying for:
 1) <b>The predator faction</b> of the requested faction AND
 2) The player from the predator faction with the <b>most kills</b>
-    
+
 Please state the <b>ID of the faction</b> you are querying for.
 
 <b>Faction Legend:</b>"""
     for id, name in factionsMap.items():
         fullText += f"\nID {id}: {name}"
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     reply_markup = makeInlineKeyboard(factionsMap.keys(), OptionIDEnum.tier3a),
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     reply_markup=makeInlineKeyboard(
+                         factionsMap.keys(), OptionIDEnum.tier3a),
+                     parse_mode='HTML')
+
 
 def handleTier3a(update, context, faction):
     killingPhase = checkKillingPhase(update, context, callback=True)
@@ -1576,9 +1667,12 @@ def handleTier3a(update, context, faction):
         return
 
     userDb = userTracker[username]["db"]
-    predatorFaction = userDb.getPredatorFaction(faction, currentGame.currentRound)
-    predatorFactionKDMap = userDb.getFactionMemberKD(faction, currentGame.currentRound)
-    sortedArr = sorted(predatorFactionKDMap.items(), key=lambda memberPoints: memberPoints[1][0], reverse=True)
+    predatorFaction = userDb.getPredatorFaction(
+        faction, currentGame.currentRound)
+    predatorFactionKDMap = userDb.getFactionMemberKD(
+        faction, currentGame.currentRound)
+    sortedArr = sorted(predatorFactionKDMap.items(
+    ), key=lambda memberPoints: memberPoints[1][0], reverse=True)
     predatorMostKillsTuple = sortedArr[0]
 
     gameMasterText = f"""<b>{factionsMap[str(predatorFaction)]} (ID: {predatorFaction})</b> is the predator faction of {factionsMap[str(faction)]}!
@@ -1586,10 +1680,11 @@ def handleTier3a(update, context, faction):
 The player in the predator faction with most kills is @{predatorMostKillsTuple[0]}, with {predatorMostKillsTuple[1][0]} kills.
 
 ~ Shan Royale 2022 Team"""
-    bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
-                     text = gameMasterText,
-                     message_id = update.callback_query.message.message_id,
-                     parse_mode = 'HTML')
+    bot.edit_message_text(chat_id=update.callback_query.message.chat.id,
+                          text=gameMasterText,
+                          message_id=update.callback_query.message.message_id,
+                          parse_mode='HTML')
+
 
 def tier3bCmd(update, context):
     killingPhase = checkKillingPhase(update, context)
@@ -1599,18 +1694,20 @@ def tier3bCmd(update, context):
     gameMaster = checkGameMaster(update, context, username)
     if not gameMaster:
         return
-    
+
     fullText = f"""You are querying for <b>{tier3bNumToSelect} people from the prey faction</b> of the requested faction, who possess the <b>most number of points</b>.
-    
+
 Please state the <b>ID of the faction</b> you are querying for.
 
 <b>Faction Legend:</b>"""
     for id, name in factionsMap.items():
         fullText += f"\nID {id}: {name}"
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     reply_markup = makeInlineKeyboard(factionsMap.keys(), OptionIDEnum.tier3b),
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     reply_markup=makeInlineKeyboard(
+                         factionsMap.keys(), OptionIDEnum.tier3b),
+                     parse_mode='HTML')
+
 
 def handleTier3b(update, context, faction):
     killingPhase = checkKillingPhase(update, context, callback=True)
@@ -1622,16 +1719,18 @@ def handleTier3b(update, context, faction):
         return
 
     userDb = userTracker[username]["db"]
-    preyFaction = userDb.getTargetFactionFromFaction(faction, currentGame.currentRound)
-    preyMemberPointsMap = userDb.getFactionMemberPoints(preyFaction, currentGame.currentRound)
-    sortedArr = sorted(preyMemberPointsMap.items(), key=lambda memberPoints: memberPoints[1], reverse=True)
+    preyFaction = userDb.getTargetFactionFromFaction(
+        faction, currentGame.currentRound)
+    preyMemberPointsMap = userDb.getFactionMemberPoints(
+        preyFaction, currentGame.currentRound)
+    sortedArr = sorted(preyMemberPointsMap.items(),
+                       key=lambda memberPoints: memberPoints[1], reverse=True)
     print(f"Tier 3b Prey Faction Arr: {sortedArr}")
-    
-    
+
     numPreyToSelect = tier3bNumToSelect
     if len(sortedArr) <= tier3bNumToSelect:
         numPreyToSelect = len(sortedArr)
-    
+
     indexArray = [x for x in range(numPreyToSelect)]
     print(indexArray)
 
@@ -1644,10 +1743,11 @@ def handleTier3b(update, context, faction):
 
 {pointsTxt}
 ~ Shan Royale 2022 Team"""
-    bot.edit_message_text(chat_id = update.callback_query.message.chat.id,
-                     text = gameMasterText,
-                     message_id = update.callback_query.message.message_id,
-                     parse_mode = 'HTML')
+    bot.edit_message_text(chat_id=update.callback_query.message.chat.id,
+                          text=gameMasterText,
+                          message_id=update.callback_query.message.message_id,
+                          parse_mode='HTML')
+
 
 def giveStickCmd(update, context):
     killingPhase = checkKillingPhase(update, context)
@@ -1668,9 +1768,10 @@ def giveStickCmd(update, context):
 If you wish to <b>proceed</b>, type in the <b>telegram handle of the victim</b>
 
 If you wish to <b>cancel</b>, type in /cancelGiveStick"""
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     parse_mode='HTML')
+
 
 def handleGiveStick(update, context, giveStickUsername):
     print(f"HANDLING GIVE STICK OF {giveStickUsername}")
@@ -1686,9 +1787,9 @@ def handleGiveStick(update, context, giveStickUsername):
     if giveStickUsername == "/cancelGiveStick":
         setState(username, None)
         fullText = f"Give Stick has been cancelled\n\n{dontWasteMyTimeText}"
-        bot.send_message(chat_id = userTracker[username]["chat_id"],
-            text = fullText,
-            parse_mode = 'HTML')
+        bot.send_message(chat_id=userTracker[username]["chat_id"],
+                         text=fullText,
+                         parse_mode='HTML')
         return
 
     valid = validUsername(update, context, giveStickUsername)
@@ -1705,10 +1806,11 @@ def handleGiveStick(update, context, giveStickUsername):
 
 Sticks given in Round 1: {currentGame.stickRound1}
 Sticks given in Round 2: {currentGame.stickRound2}"""
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     parse_mode='HTML')
     setState(username, None)
+
 
 def canGiveStick(update, context):
     cannotGiveText = f"""You may not give sticks as the round's stick count has been maxed out!\n\n{dontWasteMyTimeText}"""
@@ -1716,14 +1818,15 @@ def canGiveStick(update, context):
     if currentStick == None:
         print("ERR: Current Stick is None.")
         return
-    
+
     canGive = currentStick < maxStickPerRound
     if not canGive:
-        bot.send_message(chat_id = update.message.chat.id,
-                    text = cannotGiveText,
-                    parse_mode = 'HTML')
+        bot.send_message(chat_id=update.message.chat.id,
+                         text=cannotGiveText,
+                         parse_mode='HTML')
         return False
     return True
+
 
 def checkStickCmd(update, context):
     killingPhase = checkKillingPhase(update, context)
@@ -1740,9 +1843,10 @@ def checkStickCmd(update, context):
     fullText = f"""Sticks left for:
 Round 1 - {currentGame.stickRound1}
 Round 2 - {currentGame.stickRound2}"""
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     parse_mode='HTML')
+
 
 #TODO: Add in elimination tiers
 def eliminationCmd(update, context):
@@ -1761,9 +1865,10 @@ def eliminationCmd(update, context):
 If you wish to <b>proceed</b>, type in the <b>telegram handle of the victim</b>, as requested by the player.
 
 If you wish to <b>cancel</b>, type in /cancelElimination"""
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     parse_mode='HTML')
+
 
 def eliminationAskFaction(update, context, victimUsername):
     killingPhase = checkKillingPhase(update, context)
@@ -1777,9 +1882,9 @@ def eliminationAskFaction(update, context, victimUsername):
     if victimUsername == "/cancelElimination":
         setState(username, None)
         fullText = f"Elimination has been cancelled\n\n{dontWasteMyTimeText}"
-        bot.send_message(chat_id = userTracker[username]["chat_id"],
-            text = fullText,
-            parse_mode = 'HTML')
+        bot.send_message(chat_id=userTracker[username]["chat_id"],
+                         text=fullText,
+                         parse_mode='HTML')
         return
 
     valid = validUsername(update, context, victimUsername)
@@ -1794,10 +1899,12 @@ def eliminationAskFaction(update, context, victimUsername):
 <b>Faction Legend:</b>"""
     for id, name in factionsMap.items():
         fullText += f"\nID {id}: {name}"
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     reply_markup = makeInlineKeyboard(factionsMap.keys(), OptionIDEnum.eliminationAskFaction),
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     reply_markup=makeInlineKeyboard(
+                         factionsMap.keys(), OptionIDEnum.eliminationAskFaction),
+                     parse_mode='HTML')
+
 
 def handleElimination(update, context, killerFaction):
     username = update.callback_query.message.chat.username
@@ -1819,24 +1926,26 @@ def handleElimination(update, context, killerFaction):
     if victimUsername == "/cancelElimination":
         setState(username, None)
         fullText = f"Kill has been cancelled\n\n{dontWasteMyTimeText}"
-        bot.send_message(chat_id = userTracker[username]["chat_id"],
-            text = fullText,
-            parse_mode = 'HTML')
+        bot.send_message(chat_id=userTracker[username]["chat_id"],
+                         text=fullText,
+                         parse_mode='HTML')
         return
 
     eliminationKill(update, context, killerFaction, victimUsername)
-    
+
     userTracker[username]["elimination_target"] = ""
     setState(username, None)
+
 
 def eliminationKill(update, context, killerFaction, victimUsername):
     username = update.callback_query.message.chat.username
     userDb = userTracker[username]["db"]
-    victimData = userDb.getPlayerDataJSON(victimUsername, currentGame.currentRound)
+    victimData = userDb.getPlayerDataJSON(
+        victimUsername, currentGame.currentRound)
 
     victimFaction = victimData[playerDataKeys.faction]
     killerFactionData = userDb.getFactionDataJSON(killerFaction)
-    
+
     # Update faction data
     pointsToAdd = victimData[playerDataKeys.points]
     killerFactionData[factionDataKeys.bank] += pointsToAdd
@@ -1858,14 +1967,15 @@ def eliminationKill(update, context, killerFaction, victimUsername):
 
 Points added to faction bank: <b>{pointsToAdd}pts</b>
 Current faction bank balance: <b>{killerFactionData[factionDataKeys.bank]}pts</b>."""
-    killerFactionMembers = userDb.getFactionMemberUsernames(killerFaction, currentGame.currentRound)
+    killerFactionMembers = userDb.getFactionMemberUsernames(
+        killerFaction, currentGame.currentRound)
     for username in killerFactionMembers:
         if username not in userTracker.keys():
             continue
         chat_id = userTracker[username]["chat_id"]
-        bot.send_message(chat_id = chat_id,
-            text = killerFactionText,
-            parse_mode = 'HTML')
+        bot.send_message(chat_id=chat_id,
+                         text=killerFactionText,
+                         parse_mode='HTML')
 
     # Blast message to victim's faction
     victimFactionText = f"""<b>{factionsMap[str(victimFaction)]} Faction Update</b>
@@ -1875,48 +1985,52 @@ Current faction bank balance: <b>{killerFactionData[factionDataKeys.bank]}pts</b
 Their points have been <b>reset to {minPoints}</b>.
 
 <b>Note:</b> The victim, {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}), is <b>NOT immune from subsequent kills</b>."""
-    victimFactionMembers = userDb.getFactionMemberUsernames(victimFaction, currentGame.currentRound)
+    victimFactionMembers = userDb.getFactionMemberUsernames(
+        victimFaction, currentGame.currentRound)
     for username in victimFactionMembers:
         if username not in userTracker.keys():
             continue
         chat_id = userTracker[username]["chat_id"]
-        bot.send_message(chat_id = chat_id,
-            text = victimFactionText,
-            parse_mode = 'HTML')
+        bot.send_message(chat_id=chat_id,
+                         text=victimFactionText,
+                         parse_mode='HTML')
 
-#===================Message and Callback Handlers==============================
+# ===================Message and Callback Handlers==============================
+
+
 def mainMessageHandler(update, context):
     username = update.message.chat.username
     text = update.message.text
     currentState = userTracker[username]["state"]
-    match currentState:
-        case StateEnum.setPoints:
-            handleSetPoints(update, context, text)
-            return
-        case StateEnum.kill:
-            handleKill(update, context, text)
-            return
-        case StateEnum.giveStick:
-            handleGiveStick(update, context, text)
-            return
-        case StateEnum.elimination:
-            eliminationAskFaction(update, context, text)
-            return
-        case StateEnum.adminAddPoints:
-            handleAdminAddPoints(update, context, text)
-            return
-        case StateEnum.adminBroadcast:
-            handleAdminBroadcast(update, context, text)
-            return
-        case StateEnum.yellowCard:
-            handleYellowCard(update, context, text)
-            return
-        case StateEnum.redCard:
-            handleRedCard(update, context, text)
-            return
-        case _:
-            print(f'ERROR IN MSGHANDLER: No such state defined ({currentState})\nText: {text}')
-            return
+    if currentState == StateEnum.setPoints:
+        handleSetPoints(update, context, text)
+        return
+    elif currentState == StateEnum.kill:
+        handleKill(update, context, text)
+        return
+    elif currentState == StateEnum.giveStick:
+        handleGiveStick(update, context, text)
+        return
+    elif currentState == StateEnum.elimination:
+        eliminationAskFaction(update, context, text)
+        return
+    elif currentState == StateEnum.adminAddPoints:
+        handleAdminAddPoints(update, context, text)
+        return
+    elif currentState == StateEnum.adminBroadcast:
+        handleAdminBroadcast(update, context, text)
+        return
+    elif currentState == StateEnum.yellowCard:
+        handleYellowCard(update, context, text)
+        return
+    elif currentState == StateEnum.redCard:
+        handleRedCard(update, context, text)
+        return
+    else:
+        print(
+            f'ERROR IN MSGHANDLER: No such state defined ({currentState})\nText: {text}')
+        return
+
 
 def mainCallBackHandler(update, context):
     dataClicked = ast.literal_eval(update.callback_query.data)
@@ -1966,18 +2080,21 @@ def mainCallBackHandler(update, context):
         pumpAdminBroadcast(update, context, value)
         return
     else:
-        print(f'ERROR IN CALLBACKHANDLER: No such optionID defined ({optionID})\nValue: {value}')
+        print(
+            f'ERROR IN CALLBACKHANDLER: No such optionID defined ({optionID})\nValue: {value}')
         return
 
-#=========================Game Phase Checkers=========================
+# =========================Game Phase Checkers=========================
+
 def checkSetPointsPhase(update, context):
     if (not currentGame.play) or currentGame.killEnabled:
         fullText = f"Set points phase has not started yet!\n\n{dontWasteMyTimeText}"
-        bot.send_message(chat_id = update.message.chat.id,
-            text = fullText,
-            parse_mode = 'HTML')
+        bot.send_message(chat_id= update.message.chat.id,
+                         text = fullText,
+                         parse_mode = 'HTML')
         return False
     return True
+
 
 def checkKillingPhase(update, context, callback=False):
     if callback:
@@ -1986,11 +2103,12 @@ def checkKillingPhase(update, context, callback=False):
         chat_id = update.message.chat.id
     if (not currentGame.play) or (not currentGame.killEnabled):
         fullText = f"Killing phase has not started yet!\n\n{dontWasteMyTimeText}"
-        bot.send_message(chat_id = chat_id,
-            text = fullText,
-            parse_mode = 'HTML')
+        bot.send_message(chat_id= chat_id,
+                         text = fullText,
+                         parse_mode = 'HTML')
         return False
     return True
+
 
 def checkPlayPhase(update, context, callback=False):
     if callback:
@@ -1999,42 +2117,46 @@ def checkPlayPhase(update, context, callback=False):
         chat_id = update.message.chat.id
     if not currentGame.play:
         fullText = f"Round has not started yet!\n\n{dontWasteMyTimeText}"
-        bot.send_message(chat_id = chat_id,
-            text = fullText,
-            parse_mode = 'HTML')
+        bot.send_message(chat_id= chat_id,
+                         text = fullText,
+                         parse_mode = 'HTML')
         return False
     return True
 
-#=========================Authentication helpers=======================
+# =========================Authentication helpers=======================
+
 def checkAdmin(update, context, username):
     if username in admins:
         return True
-    
+
     fullText = f"You are not admin!\n\n{dontWasteMyTimeText}"
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id= update.message.chat.id,
+                     text= fullText,
+                     parse_mode= 'HTML')
     return False
+
 
 def checkGameMaster(update, context, username):
     if username in gameMasters:
         return True
 
     fullText = f"You are not GameMaster!\n\n{dontWasteMyTimeText}"
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id= update.message.chat.id,
+                     text= fullText,
+                     parse_mode= 'HTML')
     return False
+
 
 def checkSafety(update, context, username):
     if username in safetyOfficers:
         return True
 
     fullText = f"You are not Safety!\n\n{dontWasteMyTimeText}"
-    bot.send_message(chat_id = update.message.chat.id,
-                     text = fullText,
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id= update.message.chat.id,
+                     text= fullText,
+                     parse_mode= 'HTML')
     return False
+
 
 def checkSafetyBreaches(update, context, callback=False):
     if callback:
@@ -2046,27 +2168,32 @@ def checkSafetyBreaches(update, context, callback=False):
     cumulativePlayerSafetyBreaches = getPlayerSafetyBreaches(username)
     if cumulativePlayerSafetyBreaches < highestAllowedSafetyBreach:
         return True
-    
+
     fullText = f"You have a total of {cumulativePlayerSafetyBreaches} Safety Breaches! You may not play the game.\n\n{dontWasteMyTimeText}"
-    bot.send_message(chat_id = chat_id,
-                     text = fullText,
-                     parse_mode = 'HTML')
+    bot.send_message(chat_id= chat_id,
+                     text= fullText,
+                     parse_mode= 'HTML')
     return False
 
-#======================Getters=================================
+# ======================Getters=================================
+
 def getTargetFaction(username):
     userDb = userTracker[username]["db"]
-    return userDb.getTargetFaction(username, currentGame.currentRound) 
+    return userDb.getTargetFaction(username, currentGame.currentRound)
+
 
 def getAllFactionPoints(adminDb):
     factionPointsMap = {}
     for faction in factionsMap.keys():
-        factionPoints = adminDb.getFactionPoints(faction, currentGame.currentRound)
+        factionPoints = adminDb.getFactionPoints(
+            faction, currentGame.currentRound)
         factionPointsMap[faction] = factionPoints
     return factionPointsMap
 
+
 def getAllUsernames(db):
     return db.getAllUsernames(currentGame.currentRound)
+
 
 def getPlayerSafetyBreaches(username):
     userDb = userTracker[username]["db"]
@@ -2076,6 +2203,7 @@ def getPlayerSafetyBreaches(username):
         cumulativeSafetyBreach += roundSafetyBreach
     return cumulativeSafetyBreach
 
+
 def getStick():
     if currentGame.currentRound == str(1):
         return currentGame.stickRound1
@@ -2083,15 +2211,16 @@ def getStick():
         return currentGame.stickRound2
     print(f"Round {currentGame.currentRound} does not exist!")
 
+
 def addStick(username):
-    if currentGame.currentRound != str(1) and  currentGame.currentRound != str(2):
+    if currentGame.currentRound != str(1) and currentGame.currentRound != str(2):
         print(f"Round {currentGame.currentRound} does not exist!")
         return
     if currentGame.currentRound == str(1):
         currentGame.stickRound1 += 1
     if currentGame.currentRound == str(2):
         currentGame.stickRound2 += 1
-    
+
     userDb = userTracker[username]["db"]
     userStickExpiry = time.time() + stickExpiryInSecs
     print(userStickExpiry)
@@ -2099,14 +2228,16 @@ def addStick(username):
 
     print(f"Added Stick, Game State:\n{currentGame.toString()}")
 
-#====================Other helpers=========================
+# ====================Other helpers=========================
+
 def blastMessageToAll(text):
     for user in userTracker.values():
-        bot.send_message(chat_id = user["chat_id"],
-                     text = text,
-                     parse_mode = 'HTML')
+        bot.send_message(chat_id= user["chat_id"],
+                         text = text,
+                         parse_mode = 'HTML')
 
-#===================Main Method============================
+# ===================Main Method============================
+
 def main():
     # Start the bot.
     # Create the Updater and pass it your bot's token.
@@ -2159,11 +2290,12 @@ def main():
     dp.add_handler(CommandHandler("redcard", redCardCmd))
 
     # Handle all messages
-    dp.add_handler(MessageHandler(callback=mainMessageHandler, filters=Filters.all))
+    dp.add_handler(MessageHandler(
+        callback=mainMessageHandler, filters=Filters.all))
 
     # Handle all callback
-    dp.add_handler(CallbackQueryHandler(callback=mainCallBackHandler, pattern=str))
-
+    dp.add_handler(CallbackQueryHandler(
+        callback=mainCallBackHandler, pattern=str))
 
     # log all errors
     dp.add_error_handler(error)
@@ -2179,7 +2311,8 @@ def main():
     # start_polling() is non-blocking and will stop the bot gracefully.
     updater.start_polling()
 
-    #TODO: Update Excel sheet every once in a while
+    # TODO: Update Excel sheet every once in a while
+
 
 if __name__ == '__main__':
     main()
