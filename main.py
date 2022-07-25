@@ -219,9 +219,7 @@ Are you okay with this?"""
                          yesNoList, OptionIDEnum.endSetPoints),
                      parse_mode='HTML')
 
-# TODO: Check if all points are above 5
-# If it is not, highlight the relevant faction with lesser than 5 points,
-# and their current points assigned
+
 def handleAdminEndSetPoints(update, context, yesNo):
     global currentGame
     chat_id = update.callback_query.message.chat.id
@@ -317,11 +315,7 @@ If not, wait for the admin to begin another round!
 If there are no more round, hope you enjoyed the game and please gather at your next location!"""
     blastMessageToAll(blastText)
 
-# TODO: SORT ALL VALUES
-# TODO: HERE NOW
-# TODO: Showing player text is too long, figure out if Casper needs it
-
-
+#TODO SORT VALUES
 def adminFactionDetails(update, context):
     username = update.message.chat.username
     isAdmin = checkAdmin(update, context, username)
@@ -541,7 +535,11 @@ def yellowCardCmd(update, context):
 
     fullText = f"""<b>You are about to award someone a yellow card (1 Safety Breach)</b>
 
-If you wish to <b>proceed</b>, type in the <b>telegram handle of the offender</b>
+If you wish to <b>proceed</b>, type in the <b>telegram handle of the offender</b>.
+
+You must:
+1) type in their handle <b>exactly as is</b> (with caps, special characters etc.)
+2) <b>not put "@"</b> in front of their handle (eg. type in praveeeenk instead of @praveeeenk)
 
 If you wish to <b>cancel</b>, type in /cancelCard"""
     bot.send_message(chat_id=update.message.chat.id,
@@ -599,6 +597,10 @@ def redCardCmd(update, context):
     fullText = f"""<b>You are about to award someone a red card (2 Safety Breaches)</b>
 
 If you wish to <b>proceed</b>, type in the <b>telegram handle of the offender</b>
+
+You must:
+1) type in their handle <b>exactly as is</b> (with caps, special characters etc.)
+2) <b>not put "@"</b> in front of their handle (eg. type in praveeeenk instead of @praveeeenk)
 
 If you wish to <b>cancel</b>, type in /cancelCard"""
     bot.send_message(chat_id=update.message.chat.id,
@@ -784,9 +786,6 @@ def factionCmd(update, context):
                      text=fullText,
                      parse_mode='HTML')
 
-# TODO: SORT BANKS IF POSSIBLE
-
-
 def listBanksCmd(update, context):
     safe = checkSafetyBreaches(update, context)
     if not safe:
@@ -824,11 +823,13 @@ def setPointsCmd(update, context):
     db = userTracker[username]["db"]
     playerFaction = db.getPlayerFaction(username, currentGame.currentRound)
     currentFactionPoints = db.getFactionPoints(playerFaction, currentGame.currentRound)
+    playerCurrentPoints = db.getRoundPoints(username, currentGame.currentRound)
     setState(username, StateEnum.setPoints)
 
     fullText = f"""Type in the points allocated to you in <b>Round {currentGame.currentRound}</b>\n
 
-Points Assigned Faction-wide so far: <b>{currentFactionPoints}</b>pts
+Your Current Points: <b>{playerCurrentPoints}pts</b>
+Points Assigned Faction-wide so far: <b>{currentFactionPoints}pts</b>
 
 Take Note:<em>
 - Everyone must be allocated at least <b>5 points</b>
@@ -838,9 +839,6 @@ Take Note:<em>
     bot.send_message(chat_id=update.message.chat.id,
                      text=fullText,
                      parse_mode='HTML')
-
-# TODO: SHOW CURRENT POINTS ASSIGNED
-
 
 def handleSetPoints(update, context, text):
     chat_id = update.message.chat.id
@@ -858,7 +856,8 @@ def handleSetPoints(update, context, text):
     db = userTracker[username]["db"]
     playerFaction = db.getPlayerFaction(username, currentGame.currentRound)
     currentFactionPoints = db.getFactionPoints(playerFaction, currentGame.currentRound)
-    invalid = invalidPoints(chat_id, text, currentFactionPoints)
+    playerCurrentPoints = db.getRoundPoints(username, currentGame.currentRound)
+    invalid = invalidPoints(chat_id, text, currentFactionPoints - playerCurrentPoints)
     if invalid:
         return
     points = int(text)
@@ -866,9 +865,9 @@ def handleSetPoints(update, context, text):
     db.updateRoundPoints(username, points, currentGame.currentRound)
     updatedFactionPoints = db.getFactionPoints(playerFaction, currentGame.currentRound)
 
-    fullText = f"""Allocated {points} points to you for <b>Round {currentGame.currentRound}</b>\n\n
+    fullText = f"""Allocated <b>{points} points</b> to you for <b>Round {currentGame.currentRound}</b>
 
-Points Assigned Faction-wide so far: {updatedFactionPoints}pts
+Points Assigned Faction-wide so far: <b>{updatedFactionPoints}pts</b>
 
 Click <b>/setpoints</b> again to <b>reset</b> points for this round!
 """
@@ -908,8 +907,6 @@ def listPointsCmd(update, context):
     bot.send_message(chat_id=update.message.chat.id,
                      text=fullText,
                      parse_mode='HTML')
-
-# TODO ADD CHECKS FOR TEAM POINTS TOO!
 
 
 def invalidPoints(chat_id, text, currentFactionPoints):
@@ -1022,6 +1019,10 @@ def killCmd(update, context):
 
 If you wish to <b>proceed</b>, type in the <b>telegram handle of the victim</b>
 
+You must:
+1) type in their handle <b>exactly as is</b> (with caps, special characters etc.)
+2) <b>not put "@"</b> in front of their handle (eg. type in praveeeenk instead of @praveeeenk)
+
 If you wish to <b>cancel</b>, type in /cancelkill"""
     bot.send_message(chat_id=update.message.chat.id,
                      text=fullText,
@@ -1087,6 +1088,10 @@ def stickCmd(update, context):
 /stick should only be entered <b>once you have "killed" someone else in person.</b>
 
 If you wish to <b>proceed</b>, type in the <b>telegram handle of the victim</b>
+
+You must:
+1) type in their handle <b>exactly as is</b> (with caps, special characters etc.)
+2) <b>not put "@"</b> in front of their handle (eg. type in praveeeenk instead of @praveeeenk)
 
 If you wish to <b>cancel</b>, type in /cancelkill"""
     bot.send_message(chat_id=update.message.chat.id,
@@ -1767,6 +1772,10 @@ def giveStickCmd(update, context):
 
 If you wish to <b>proceed</b>, type in the <b>telegram handle of the victim</b>
 
+You must:
+1) type in their handle <b>exactly as is</b> (with caps, special characters etc.)
+2) <b>not put "@"</b> in front of their handle (eg. type in praveeeenk instead of @praveeeenk)
+
 If you wish to <b>cancel</b>, type in /cancelGiveStick"""
     bot.send_message(chat_id=update.message.chat.id,
                      text=fullText,
@@ -1863,6 +1872,10 @@ def eliminationCmd(update, context):
     fullText = f"""/elimination should only be entered when a player has <b>turned in the "death note"</b> at the spy station.
 
 If you wish to <b>proceed</b>, type in the <b>telegram handle of the victim</b>, as requested by the player.
+
+You must:
+1) type in their handle <b>exactly as is</b> (with caps, special characters etc.)
+2) <b>not put "@"</b> in front of their handle (eg. type in praveeeenk instead of @praveeeenk)
 
 If you wish to <b>cancel</b>, type in /cancelElimination"""
     bot.send_message(chat_id=update.message.chat.id,
