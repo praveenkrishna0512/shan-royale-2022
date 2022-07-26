@@ -61,10 +61,8 @@ factionsMap = {
 }
 
 admins = ["praveeeenk", "Casperplz"]
-gameMasters = ["praveeeenk", "Casperplz", "ddannyiel",
-    "Jobeet", "kelsykoh", "keziakhoo", "vigonometry"]
-safetyOfficers = ["praveeeenk", "Casperplz", "ddannyiel",
-    "Jobeet", "kelsykoh", "keziakhoo", "vigonometry"]
+gameMasters = ["praveeeenk", "Casperplz", "ddannyiel"]
+safetyOfficers = ["praveeeenk", "Casperplz", "ddannyiel", "Jobeet"]
 
 # TODO: LOAD UPON RESUME
 adminQuery = {}
