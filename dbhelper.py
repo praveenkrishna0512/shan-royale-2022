@@ -53,9 +53,8 @@ class DBHelper:
         self.playerTable = "playerDataRound"
         self.factionTable = "factionData"
         self.gameTable = "gameData"
-        self.setup()
 
-    
+
     def setup(self):
         playerRound1DataStmt = f"""CREATE TABLE IF NOT EXISTS {self.playerTable}1 ( 
             username TEXT PRIMARY KEY,
@@ -90,18 +89,9 @@ class DBHelper:
             enemyFactionRound2 INTEGER DEFAULT 0,
             pointsAssigned INTEGER DEFAULT 0
         )"""
-        # gameDataStmt = """CREATE TABLE IF NOT EXISTS gameData ( 
-        #     id INTEGER DEFAULT 0 PRIMARY KEY,
-        #     currentRound INTEGER DEFAULT 0,
-        #     play BOOL DEFAULT 0,
-        #     killEnabled BOOL DEFAULT 0,
-        #     stickRound1 INTEGER DEFAULT 0,
-        #     stickRound2 INTEGER DEFAULT 0
-        # )"""
         self.conn.execute(playerRound1DataStmt)
         self.conn.execute(playerRound2DataStmt)
         self.conn.execute(factionDataStmt)
-        # self.conn.execute(gameDataStmt)
         self.conn.commit()
 
     # TODO: Check if all updates and inserts have COMMIT
@@ -155,6 +145,15 @@ class DBHelper:
         args = (username,)
         for dataTuple in self.conn.execute(stmt, args):
             return self.playerDataDBtoJSON(list(dataTuple))
+
+    def getALLPlayerDataJSON(self, round_num):
+        stmt = f"SELECT * FROM {self.playerTable}{round_num}"
+        allPlayerJSON = {}
+        for dataTuple in self.conn.execute(stmt):
+            playerDataJSON = self.playerDataDBtoJSON(list(dataTuple))
+            username = playerDataJSON[playerDataKeys.username]
+            allPlayerJSON[username] = playerDataJSON
+        return allPlayerJSON 
 
     # Faction Data
     def replaceFactionDataFromJSON(self, factionDataJSON):
@@ -382,11 +381,13 @@ class DBHelper:
         for x in self.conn.execute(stmt, args):
             return x[0]
 
-    # Purge data queries
+    # Purge data
 
-    def purgeplayerData(self):
-        playerRound1Datastmt = "DELETE FROM playerRound1Data"
-        playerRound2Datastmt = "DELETE FROM playerRound2Data"
+    def purgeData(self):
+        playerRound1Datastmt = "DELETE FROM playerDataRound1"
+        playerRound2Datastmt = "DELETE FROM playerDataRound2"
+        factionDatastmt = "DELETE FROM factionData"
         self.conn.execute(playerRound1Datastmt)
         self.conn.execute(playerRound2Datastmt)
+        self.conn.execute(factionDatastmt)
         self.conn.commit()

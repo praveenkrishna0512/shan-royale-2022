@@ -32,8 +32,11 @@ excelFilePath = "./excel/shanRoyale2022Data1.xlsx"
 playerDataRound1JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="playerDataRound1").to_json(orient='records'))
 playerDataRound2JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="playerDataRound2").to_json(orient='records'))
 factionDataJSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="factionData").to_json(orient='records'))
-# TODO: HAVE TO DELETE DB B4 TRYING
+
 mainDb = DBHelper("shan-royale.sqlite")
+# Clear DB first, then setup
+mainDb.purgeData()
+mainDb.setup()
 mainDb.playerDataJSONArrToDB(playerDataRound1JSONArr, 1)
 mainDb.playerDataJSONArrToDB(playerDataRound2JSONArr, 2)
 mainDb.factionDataJSONArrToDB(factionDataJSONArr)
@@ -44,6 +47,9 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
+# Saving excel file paths
+saveStateExcelFilePath = "./excel/backup/shanRoyale2022Data.xlsx"
+
 # Initialise bot
 bot = telebot.TeleBot(API_KEY, parse_mode=None)
 
@@ -52,6 +58,7 @@ roundList = [1, 2]
 yesNoList = ["Yes", "No"]
 
 # TODO: LOAD UPON RESUME
+# Game: currentRound, play, killEnabled, stickRound1, stickRound2
 currentGame = Game(roundList[0])
 factionsMap = {
     "1": "Sparta",
@@ -60,11 +67,13 @@ factionsMap = {
     "4": "Nemesis"
 }
 
+# TODO: UPDATE
 admins = ["praveeeenk", "Casperplz"]
 gameMasters = ["praveeeenk", "Casperplz", "ddannyiel"]
 safetyOfficers = ["praveeeenk", "Casperplz", "ddannyiel", "Jobeet"]
 
 # TODO: LOAD UPON RESUME
+# "username": { <state>: <text> }
 adminQuery = {}
 
 minPoints = 5
@@ -121,6 +130,7 @@ class OptionIDEnum(enum.Enum):
 # Handles state of the bot for each user
 # Key: username
 # Value: dynamic dictionary
+# <username>: { "state": , "db": , "chat_id": , "elimination_target": ,}
 # TODO: LOAD UPON RESUME
 userTracker = {}
 
@@ -141,10 +151,18 @@ def makeInlineKeyboard(lst, optionID):
     return markup
 
 # ============================DB to file converters?===========================
-# TODO: DB to main file converters (maybe put in dbhelper.py)
+
+def saveGameState():
+    userTrackerJSON = pandas.read_json(userTracker)
+    adminQueryJSON = pandas.read_json(adminQuery)
+    
+    databaseJSON.to_excel(excel_file_string)
+    return
+
+def reloadGameState():
+    return
 
 # ====================== Admin Commands ===============================
-
 
 def adminBeginRoundCmd(update, context):
     username = update.message.chat.username
@@ -1980,8 +1998,8 @@ Points added to faction bank: <b>{pointsToAdd}pts</b>
 Current faction bank balance: <b>{killerFactionData[factionDataKeys.bank]}pts</b>."""
     killerFactionMembers = userDb.getFactionMemberUsernames(
         killerFaction, currentGame.currentRound)
-    for username in killerFactionMembers:
-        if username not in userTracker.keys():
+    for killerUsername in killerFactionMembers:
+        if killerUsername not in userTracker.keys():
             continue
         chat_id = userTracker[username]["chat_id"]
         bot.send_message(chat_id=chat_id,
@@ -1998,13 +2016,26 @@ Their points have been <b>reset to {minPoints}</b>.
 <b>Note:</b> The victim, {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}), is <b>NOT immune from subsequent kills</b>."""
     victimFactionMembers = userDb.getFactionMemberUsernames(
         victimFaction, currentGame.currentRound)
-    for username in victimFactionMembers:
-        if username not in userTracker.keys():
+    for victimUsername in victimFactionMembers:
+        if victimUsername not in userTracker.keys():
             continue
-        chat_id = userTracker[username]["chat_id"]
+        chat_id = userTracker[victimUsername]["chat_id"]
         bot.send_message(chat_id=chat_id,
                          text=victimFactionText,
                          parse_mode='HTML')
+
+
+    GMtext = f"""<b>Gamemaster Update</b>
+
+{victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}) has been <b>eliminated</b> by {factionsMap[str(killerFaction)]} Faction!
+
+Their points have been <b>reset to {minPoints}</b>.
+
+<b>Note:</b> The victim, {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}), is <b>NOT immune from subsequent kills</b>."""
+    chat_id = userTracker[username]["chat_id"]
+    bot.send_message(chat_id=chat_id,
+                        text=GMtext,
+                        parse_mode='HTML')
 
 # ===================Message and Callback Handlers==============================
 
