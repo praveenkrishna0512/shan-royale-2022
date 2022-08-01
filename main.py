@@ -4,6 +4,7 @@ from email import message
 import enum
 import json
 import logging
+from operator import index
 from os import kill
 import random
 from sqlite3 import Time
@@ -20,52 +21,65 @@ from dbhelper import DBHelper, DBKeysMap, factionDataKeys, playerDataKeys
 from game import Game
 import adminCommands as adminCmd
 import pandas
+import atexit
+from twisted.internet import task, reactor
 
 PORT = get_port()
 API_KEY = get_api_key()
 if API_KEY == None:
     raise Exception("Please update API Key")
 
-# Excel to Database
-# TODO: CHANGE TO ACTUAL EXCEL SHEET
-excelFilePath = "./excel/test/shanRoyale2022Data1.xlsx"
-playerDataRound1JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="playerDataRound1").to_json(orient='records'))
-playerDataRound2JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="playerDataRound2").to_json(orient='records'))
-factionDataJSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="factionData").to_json(orient='records'))
-
-mainDb = DBHelper("shan-royale.sqlite")
-# Clear DB first, then setup
-mainDb.purgeData()
-mainDb.setup()
-mainDb.playerDataJSONArrToDB(playerDataRound1JSONArr, 1)
-mainDb.playerDataJSONArrToDB(playerDataRound2JSONArr, 2)
-mainDb.factionDataJSONArrToDB(factionDataJSONArr)
-
-# Enable logging
+#==========================Logging===========================================
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 
 logger = logging.getLogger(__name__)
 
-# Backup Excel file paths
-saveStateExcelFilePath = "./excel/backup/ShanRoyale2022DataBackup.xlsx"
-
 # Initialise bot
 bot = telebot.TeleBot(API_KEY, parse_mode=None)
 
-# ============================Constants======================================
-# excel sheet names
-playerDataRound1SheetName = "playerDataRound1"
-playerDataRound2SheetName = "playerDataRound2"
-factionDataSheetName = "factionData"
+#====================Other Keys=============================
+class gameDataKeys:
+    currentRound = "currentRound"
+    play = "play"
+    killEnabled = "killEnabled"
+    stickRound1 = "stickRound1"
+    stickRound2 = "stickRound2"
 
+    allKeys = [currentRound, play, killEnabled, stickRound1, stickRound2]
+
+class userTrackerDataKeys:
+    username = "username"
+    state = "state"
+    db = "db"
+    chat_id = "chat_id"
+    elimination_target = "elimination_target"
+
+    allKeys = [username, state, db, chat_id, elimination_target]
+
+class adminQueryDataKeys:
+    username = "username"
+    state = "state"
+    text = "text"
+
+    allKeys = [username, state, text]
+
+# excel sheet names
+class SheetName:
+    playerDataRound1 = "playerDataRound1"
+    playerDataRound2 = "playerDataRound2"
+    factionData = "factionData"
+    gameData = "gameData"
+    userTrackerData = "userTrackerData"
+    adminQueryData = "adminQueryData"
+
+# ============================Constants======================================
 
 roundList = [1, 2]
 yesNoList = ["Yes", "No"]
 
 # TODO: LOAD UPON RESUME
-# Game: currentRound, play, killEnabled, stickRound1, stickRound2
-currentGame = Game(roundList[0])
+
 factionsMap = {
     "1": "Sparta",
     "2": "Hades",
@@ -103,8 +117,6 @@ dontWasteMyTimeText = """\"<b>Don't waste my time...</b> You aren't allowed to u
 
 # ============================Tracking State===================================
 # Possible states
-
-
 class StateEnum(enum.Enum):
     setPoints = "setPoints"
     kill = "kill"
@@ -132,7 +144,6 @@ class OptionIDEnum(enum.Enum):
     adminAddPoints = "adminAddPoints"
     adminBroadcast = "adminBroadcast"
 
-
 # Handles state of the bot for each user
 # Key: username
 # Value: dynamic dictionary
@@ -141,13 +152,102 @@ class OptionIDEnum(enum.Enum):
 userTracker = {}
 
 
+
+# ======================LOAD GAME STATE================================
+# TODO: CHANGE TO ACTUAL EXCEL SHEET
+excelFilePath = "./excel/test/shanRoyale2022Data1.xlsx"
+playerDataRound1JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name=SheetName.playerDataRound1).to_json(orient='records'))
+playerDataRound2JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name=SheetName.playerDataRound2).to_json(orient='records'))
+factionDataJSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name=SheetName.factionData).to_json(orient='records'))
+gameDataJSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name=SheetName.gameData).to_json(orient='records'))
+userTrackerDataJSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name=SheetName.userTrackerData).to_json(orient='records'))
+adminQueryDataJSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name=SheetName.adminQueryData).to_json(orient='records'))
+
+# Load Database
+mainDb = DBHelper("shan-royale.sqlite")
+# Clear DB first, then setup
+mainDb.purgeData()
+mainDb.setup()
+mainDb.playerDataJSONArrToDB(playerDataRound1JSONArr, 1)
+mainDb.playerDataJSONArrToDB(playerDataRound2JSONArr, 2)
+mainDb.factionDataJSONArrToDB(factionDataJSONArr)
+
+#TODO: Update this again after all states are accounted for.
+def stringToState(stateString) -> StateEnum:
+    if stateString == 'StateEnum.setPoints':
+        return StateEnum.setPoints
+    elif stateString == 'StateEnum.kill':
+        return StateEnum.kill
+    elif stateString == 'StateEnum.giveStick':
+        return StateEnum.giveStick
+    elif stateString == 'StateEnum.elimination':
+        return StateEnum.elimination
+    elif stateString == 'StateEnum.adminAddPoints':
+        return StateEnum.adminAddPoints
+    elif stateString == 'StateEnum.adminBroadcast':
+        return StateEnum.adminBroadcast
+    elif stateString == 'StateEnum.yellowCard':
+        return StateEnum.yellowCard
+    elif stateString == 'StateEnum.redCard':
+        return StateEnum.redCard
+    elif stateString == '' or stateString == None:
+        return None
+    else:
+        print(f'ERROR IN stringToState: No such state defined ({stateString})')
+        return None
+
+# Load Game object
+def loadGameObject() -> Game:
+    gameDict = gameDataJSONArr[0]
+    currentRound = gameDict[gameDataKeys.currentRound]
+    play = gameDict[gameDataKeys.play]
+    killEnabled = gameDict[gameDataKeys.killEnabled]
+    stickRound1 = gameDict[gameDataKeys.stickRound1]
+    stickRound2 = gameDict[gameDataKeys.stickRound2]
+    return Game(currentRound=currentRound, play=play, killEnabled=killEnabled, stickRound1=stickRound1, stickRound2=stickRound2)
+
+currentGame = loadGameObject()
+
+# Load User Tracker
+def loadUserTracker() -> dict:
+    userTracker = {}
+    for userTrackerDataDict in userTrackerDataJSONArr:
+        username = userTrackerDataDict[userTrackerDataKeys.username]
+        newDict = {}
+        state = stringToState(userTrackerDataDict[userTrackerDataKeys.state])
+        newDict[userTrackerDataKeys.state] = state
+        newDict[userTrackerDataKeys.db] = DBHelper()
+        newDict[userTrackerDataKeys.chat_id] = userTrackerDataDict[userTrackerDataKeys.chat_id]
+        newDict[userTrackerDataKeys.elimination_target] = userTrackerDataDict[userTrackerDataKeys.elimination_target]
+        userTracker[username] = newDict
+    return userTracker
+
+userTracker = loadUserTracker()
+print(userTracker)
+
+# Load User Tracker
+def loadAdminQuery() -> dict:
+    adminQuery = {}
+    for adminQueryDataDict in adminQueryDataJSONArr:
+        username = adminQueryDataDict[adminQueryDataKeys.username]
+        newDict = {}
+        state = stringToState(adminQueryDataDict[adminQueryDataKeys.state])
+        text = adminQueryDataDict[adminQueryDataKeys.text]
+        newDict[state] = text
+        adminQuery[username] = newDict
+    return adminQuery
+
+adminQuery = loadAdminQuery()
+print(adminQuery)
+
+# ========================== State functions ======================================
+
 def setState(username, state):
     userTracker[username].update({"state": state})
     print("State updated for " + username + ": " + str(userTracker[username]))
 
 # ============================Key boards===================================
 # Makes Inline Keyboard
-
 
 def makeInlineKeyboard(lst, optionID):
     markup = types.InlineKeyboardMarkup()
@@ -159,22 +259,48 @@ def makeInlineKeyboard(lst, optionID):
 # ============================DB to file converters?===========================
 
 def saveGameState():
+    print(f"SAVING GAME STATE AT: {time.localtime()}")
     allPlayerData1Dict = mainDb.getALLPlayerDataJSON(1)
     allPlayerData2Dict = mainDb.getALLPlayerDataJSON(2)
     allFactionDataDict = mainDb.getALLFactionDataJSON()
+    
+    gameDataDict = {}
+    dummyDict = {}
+    for key in gameDataKeys.allKeys:
+        dummyDict[key] = getattr(currentGame, key)
+    gameDataDict["game"] = dummyDict
+
+    dummyTrackerDict = {}
+    for username, dictionary in userTracker.items():
+        temp = {}
+        temp[userTrackerDataKeys.username] = username
+        for key, value in dictionary.items():
+            temp[key] = value
+        dummyTrackerDict[username] = temp
+
+    dummyAdminDict = {}
+    for username, dictionary in adminQuery.items():
+        temp = {}
+        for state, text in dictionary.items():
+            temp[adminQueryDataKeys.username] = username
+            temp[adminQueryDataKeys.state] = state
+            temp[adminQueryDataKeys.text] = text
+        dummyAdminDict[username] = temp
 
     allPlayerData1JSON = pandas.DataFrame.from_dict(allPlayerData1Dict, orient="index")
     allPlayerData2JSON = pandas.DataFrame.from_dict(allPlayerData2Dict, orient="index")
     allFactionDataJSON = pandas.DataFrame.from_dict(allFactionDataDict, orient="index")
-    with pandas.ExcelWriter(saveStateExcelFilePath) as writer:  
-        allPlayerData1JSON.to_excel(writer, sheet_name=playerDataRound1SheetName)
-        allPlayerData2JSON.to_excel(writer, sheet_name=playerDataRound2SheetName)
-        allFactionDataJSON.to_excel(writer, sheet_name=factionDataSheetName)
-    return
-
-def reloadGameState():
-    return
-
+    gameDataJSON = pandas.DataFrame.from_dict(gameDataDict, orient="index")
+    userTrackerJSON = pandas.DataFrame.from_dict(dummyTrackerDict, orient="index")
+    adminQueryJSON = pandas.DataFrame.from_dict(dummyAdminDict, orient="index")
+    with pandas.ExcelWriter(excelFilePath) as writer:
+        allPlayerData1JSON.to_excel(writer, sheet_name=SheetName.playerDataRound1)
+        allPlayerData2JSON.to_excel(writer, sheet_name=SheetName.playerDataRound2)
+        allFactionDataJSON.to_excel(writer, sheet_name=SheetName.factionData)
+        gameDataJSON.to_excel(writer, sheet_name=SheetName.gameData)
+        userTrackerJSON.to_excel(writer, sheet_name=SheetName.userTrackerData)
+        adminQueryJSON.to_excel(writer, sheet_name=SheetName.adminQueryData)
+ 
 # ====================== Admin Commands ===============================
 
 def adminBeginRoundCmd(update, context):
@@ -678,6 +804,7 @@ def handleRedCard(update, context, offenderUsername):
 #========================Player Command Handlers===============================================
 def startCmd(update, context):
     username = update.message.chat.username
+    print(update.message.chat.id)
 
     # Create database (this is required to ensure multiple ppl dont use the same db object)
     db = DBHelper()
@@ -906,7 +1033,6 @@ Click <b>/setpoints</b> again to <b>reset</b> points for this round!
 
     setState(username, None)
 
-
 def listPointsCmd(update, context):
     playPhase = checkPlayPhase(update, context)
     if not playPhase:
@@ -936,7 +1062,6 @@ def listPointsCmd(update, context):
     bot.send_message(chat_id=update.message.chat.id,
                      text=fullText,
                      parse_mode='HTML')
-
 
 def invalidPoints(chat_id, text, currentFactionPoints):
     try:
@@ -972,7 +1097,6 @@ Please enter your points for this round again."""
     return False
 
 # =========================Killing Mechanism================================
-
 
 def dyingCmd(update, context):
     killingPhase = checkKillingPhase(update, context)
@@ -2294,8 +2418,6 @@ def blastMessageToAll(text):
 # ===================Main Method============================
 
 def main():
-    #TODO: REMOVE
-    saveGameState()
 
     # Start the bot.
     # Create the Updater and pass it your bot's token.
@@ -2358,6 +2480,10 @@ def main():
     # log all errors
     dp.add_error_handler(error)
 
+    
+    # Save Game State upon exit
+    atexit.register(saveGameState)
+
     # Start the Bot
     # updater.start_webhook(listen="0.0.0.0",
     #                   port=int(PORT),
@@ -2369,7 +2495,11 @@ def main():
     # start_polling() is non-blocking and will stop the bot gracefully.
     updater.start_polling()
 
-    # TODO: Update Excel sheet every once in a while
+    # Save Excel sheet every 60s
+    timeout = 60.0
+    l = task.LoopingCall(saveGameState)
+    l.start(timeout)
+    reactor.run()
 
 
 if __name__ == '__main__':
