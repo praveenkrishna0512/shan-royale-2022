@@ -53,9 +53,9 @@ class userTrackerDataKeys:
     state = "state"
     db = "db"
     chat_id = "chat_id"
-    elimination_target = "elimination_target"
+    smite_target = "smite_target"
 
-    allKeys = [username, state, db, chat_id, elimination_target]
+    allKeys = [username, state, db, chat_id, smite_target]
 
 class adminQueryDataKeys:
     username = "username"
@@ -119,11 +119,13 @@ dontWasteMyTimeText = """\"<b>Don't waste my time...</b> You aren't allowed to u
 # Possible states
 class StateEnum(enum.Enum):
     setPoints = "setPoints"
-    kill = "kill"
+    eliminate = "eliminate"
     giveStick = "giveStick"
-    elimination = "elimination"
+    smite = "smite"
     adminAddPoints = "adminAddPoints"
     adminBroadcast = "adminBroadcast"
+    # adminPause = "adminPause"
+    # adminResume = "adminResume"
     yellowCard = "yellowCard"
     redCard = "redCard"
 
@@ -147,7 +149,7 @@ class OptionIDEnum(enum.Enum):
 # Handles state of the bot for each user
 # Key: username
 # Value: dynamic dictionary
-# <username>: { "state": , "db": , "chat_id": , "elimination_target": ,}
+# <username>: { "state": , "db": , "chat_id": , "smite_target": ,}
 # TODO: LOAD UPON RESUME
 userTracker = {}
 
@@ -177,11 +179,11 @@ def stringToState(stateString) -> StateEnum:
     if stateString == 'StateEnum.setPoints':
         return StateEnum.setPoints
     elif stateString == 'StateEnum.kill':
-        return StateEnum.kill
+        return StateEnum.eliminate
     elif stateString == 'StateEnum.giveStick':
         return StateEnum.giveStick
     elif stateString == 'StateEnum.elimination':
-        return StateEnum.elimination
+        return StateEnum.smite
     elif stateString == 'StateEnum.adminAddPoints':
         return StateEnum.adminAddPoints
     elif stateString == 'StateEnum.adminBroadcast':
@@ -218,7 +220,7 @@ def loadUserTracker() -> dict:
         newDict[userTrackerDataKeys.state] = state
         newDict[userTrackerDataKeys.db] = DBHelper()
         newDict[userTrackerDataKeys.chat_id] = userTrackerDataDict[userTrackerDataKeys.chat_id]
-        newDict[userTrackerDataKeys.elimination_target] = userTrackerDataDict[userTrackerDataKeys.elimination_target]
+        newDict[userTrackerDataKeys.smite_target] = userTrackerDataDict[userTrackerDataKeys.smite_target]
         userTracker[username] = newDict
     return userTracker
 
@@ -324,7 +326,7 @@ def handleAdminBeginRound(update, context, round_no):
 
     adminText = f"""Thanks sir! Set Points phase for Round {currentGame.currentRound} has begun!!
 
-Make sure to type /adminEndSetPoints to begin the Killing Phase."""
+Make sure to type /adminEndSetPoints to begin the EliminaSHAN Phase."""
     bot.edit_message_text(chat_id=update.callback_query.message.chat.id,
                           text=adminText,
                           message_id=update.callback_query.message.message_id,
@@ -341,7 +343,7 @@ You are now in the <b>Set Points</b> phase
 - Enter /listpoints to see the <b>points of all members</b> in your faction
 - Do not exceed your team cumulative points of <b>200</b>
 - Everyone must be assigned at least <b>5 points</b>
-- Killing is now <b>disabled</b>. You will be notified when the Killing phase begins
+- Elimination is now <b>disabled</b>. You will be notified when the Elimination phase begins
 
 Enjoy!"""
     blastMessageToAll(blastText)
@@ -392,7 +394,7 @@ Once that is done, please type /adminEndSetPoints again.\n\n{dontWasteMyTimeText
     # "Yes" was pressed
     currentGame = adminCmd.endSetPoints(currentGame)
     print(f"Admin End Set Points Game State:\n{currentGame.toString()}")
-    adminText = f"""You have ended Set Points phase for Round {currentGame.currentRound}! Killing has now been enabled :)"""
+    adminText = f"""You have ended Set Points phase for Round {currentGame.currentRound}! Elimination has now been enabled :)"""
     bot.edit_message_text(chat_id=chat_id,
                           text=adminText,
                           message_id=message_id,
@@ -404,7 +406,7 @@ Once that is done, please type /adminEndSetPoints again.\n\n{dontWasteMyTimeText
         text = f"""<b>NOTICE</b>
 Round {currentGame.currentRound} has begun!!
 
-You are now in the <b>Killing</b> phase
+You are now in the <b>Elimination</b> phase
 
 <b>Details of phase:</b>
 - Duration: <b>45 mins</b>
@@ -481,7 +483,7 @@ def adminFactionDetails(update, context):
     summaryText = "<b>Factions Summary</b>"
     bankText = "\n\n<b>Banks</b>"
     totalPointsTxt = "\n\n<b>Points</b>"
-    totalKillsTxt = "\n\n<b>Kills</b>"
+    totalKillsTxt = "\n\n<b>Eliminations</b>"
     totalDeathsTxt = "\n\n<b>Deaths</b>"
     playerText = "\n\n"
     for playerFaction in factionsMap.keys():
@@ -498,7 +500,7 @@ def adminFactionDetails(update, context):
         header = f"""---------------------------------------
 <b>{factionsMap[str(playerFaction)]} Faction Individual Stats (ID: {playerFaction})</b>"""
         pointsTxt = "\n\n<b>Current Points:</b>"
-        killCountTxt = "\n\n<b>Kill Count:</b>"
+        killCountTxt = "\n\n<b>Elimination Count:</b>"
         deathCountTxt = "\n\n<b>Death Count:</b>"
         for username, points in factionMembersPointsMap.items():
             totalPoints += points
@@ -677,6 +679,10 @@ def pumpAdminBroadcast(update, context, yesNo):
     setState(username, None)
     return
 
+# TODO
+def adminPause(update, context):
+    return
+
 # ===========================Safety Officer Comands===========================================
 
 
@@ -804,7 +810,6 @@ def handleRedCard(update, context, offenderUsername):
 #========================Player Command Handlers===============================================
 def startCmd(update, context):
     username = update.message.chat.username
-    print(update.message.chat.id)
 
     # Create database (this is required to ensure multiple ppl dont use the same db object)
     db = DBHelper()
@@ -830,9 +835,14 @@ Please contact @praveeeenk if the problem persists."""
             "state": None,
             "db": db,
             "chat_id": update.message.chat.id,
-            "elimination_target": ""
+            "smite_target": ""
         }
         userTracker[username] = newUserTracker
+    else:
+        newUserTracker = userTracker[username]
+        newUserTracker["db"] = db
+        userTracker[username] = newUserTracker
+
     print("User Tracker: " + str(userTracker))
 
 
@@ -845,8 +855,8 @@ def helpCmd(update, context):
 <b>/setpoints</b> - Set/Reset your points for current round in Shan Royale
 <b>/listpoints</b> - List your faction members' points for current round in Shan Royale
 <b>/dying</b> - Set yourself as dying
-<b>/kill</b> - Initiate a kill on someone
-<b>/stick</b> - Use your stick to initiate a kill on someone
+<b>/eliminate</b> - Initiate an elimination on someone
+<b>/stick</b> - Use your stick to initiate an elimination on someone
 <b>/visitspystation</b> - Record your visit to the spy station
 """
 
@@ -859,7 +869,7 @@ def helpCmd(update, context):
 <b>/tier3b</b> - Get Tier 3b information
 <b>/givestick</b> - Give stick to a player
 <b>/checkstick</b> - Check how many sticks have been given out
-<b>/elimination</b> - Eliminate a player upon request
+<b>/smite</b> - Smite a player upon request
 """
 
     safetyCmds = """<b>Here are the suppported safety officer commands:</b>\n
@@ -869,7 +879,7 @@ def helpCmd(update, context):
 
     adminCmds = """<b>Here are the supported admin commands:</b>\n
 <b>/adminbeginround</b> - Begin the Set Points phase for a round
-<b>/adminendsetpoints</b> - End the Set Points phase and begin Killing phase for the current round
+<b>/adminendsetpoints</b> - End the Set Points phase and begin Elimination phase for the current round
 <b>/adminendround</b> - End the Round despite the phase
 <b>/adminfactiondetails</b> - Get summary of all faction details
 <b>/adminaddpoints</b> - Add points to a faction's bank
@@ -922,7 +932,7 @@ def factionCmd(update, context):
     header = f"<b>{factionsMap[str(playerFaction)]} Faction Stats (id: {playerFaction})</b>"
     bankTxt = f"\n\n<b>Bank:</b> {factionBank}"
     pointsTxt = "\n\n<b>Current Points:</b>"
-    killCountTxt = "\n\n<b>Kill Count:</b>"
+    killCountTxt = "\n\n<b>Elimination Count:</b>"
     deathCountTxt = "\n\n<b>Death Count:</b>"
     for memberPoints in sortedMemberPointsArr:
         username = memberPoints[0]
@@ -1096,11 +1106,11 @@ Please enter your points for this round again."""
     
     return False
 
-# =========================Killing Mechanism================================
+# =========================Elimination Mechanism================================
 
 def dyingCmd(update, context):
-    killingPhase = checkKillingPhase(update, context)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context)
+    if not eliminationPhase:
         return
     safe = checkSafetyBreaches(update, context)
     if not safe:
@@ -1110,7 +1120,7 @@ def dyingCmd(update, context):
     if immune:
         return
 
-    fullText = f"""/dying should only be entered <b>once you have been "killed" in person by someone else.</b>
+    fullText = f"""/dying should only be entered <b>once you have been "eliminated" in person by someone else.</b>
 
 Press yes if you wish to proceed."""
     bot.send_message(chat_id=update.message.chat.id,
@@ -1126,8 +1136,8 @@ def handleDying(update, context, yesNo):
     safe = checkSafetyBreaches(update, context, callback=True)
     if not safe:
         return
-    killingPhase = checkKillingPhase(update, context, callback=True)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context, callback=True)
+    if not eliminationPhase:
         setState(username, None)
         return
     username = update.callback_query.message.chat.username
@@ -1145,9 +1155,9 @@ def handleDying(update, context, yesNo):
     userDb = userTracker[username]["db"]
     userDb.setPlayerDying(username, currentGame.currentRound, True)
 
-    fullText = f"""<b>You have registered yourself as dying.</b> The killer must now /kill to confirm the kill.
+    fullText = f"""<b>You have registered yourself as dying.</b> The eliminater must now /eliminate to confirm the elimination.
 
-You will be informed on the changes in points once the kill is validated."""
+You will be informed on the changes in points once the elimination is validated."""
     bot.edit_message_text(chat_id=chat_id,
                           text=fullText,
                           message_id=message_id,
@@ -1155,8 +1165,8 @@ You will be informed on the changes in points once the kill is validated."""
 
 
 def killCmd(update, context):
-    killingPhase = checkKillingPhase(update, context)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context)
+    if not eliminationPhase:
         return
     safe = checkSafetyBreaches(update, context)
     if not safe:
@@ -1166,9 +1176,9 @@ def killCmd(update, context):
     if immune:
         return
 
-    setState(username, StateEnum.kill)
+    setState(username, StateEnum.eliminate)
 
-    fullText = f"""/kill should only be entered <b>once you have "killed" someone else in person.</b>
+    fullText = f"""/eliminate should only be entered <b>once you have "eliminated" someone else in person.</b>
 
 If you wish to <b>proceed</b>, type in the <b>telegram handle of the victim</b>
 
@@ -1176,7 +1186,7 @@ You must:
 1) type in their handle <b>exactly as is</b> (with caps, special characters etc.)
 2) <b>not put "@"</b> in front of their handle (eg. type in praveeeenk instead of @praveeeenk)
 
-If you wish to <b>cancel</b>, type in /cancelkill"""
+If you wish to <b>cancel</b>, type in /canceleliminate"""
     bot.send_message(chat_id=update.message.chat.id,
                      text=fullText,
                      parse_mode='HTML')
@@ -1185,17 +1195,17 @@ If you wish to <b>cancel</b>, type in /cancelkill"""
 def handleKill(update, context, victimUsername):
     print(f"HANDLING KILL OF {victimUsername}")
     username = update.message.chat.username
-    killingPhase = checkKillingPhase(update, context)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context)
+    if not eliminationPhase:
         setState(username, None)
         return
     safe = checkSafetyBreaches(update, context)
     if not safe:
         return
 
-    if victimUsername == "/cancelkill":
+    if victimUsername == "/canceleliminate":
         setState(username, None)
-        fullText = f"Kill has been cancelled\n\n{dontWasteMyTimeText}"
+        fullText = f"Elimination has been cancelled\n\n{dontWasteMyTimeText}"
         bot.send_message(chat_id=userTracker[username]["chat_id"],
                          text=fullText,
                          parse_mode='HTML')
@@ -1220,8 +1230,8 @@ def handleKill(update, context, victimUsername):
 
 
 def stickCmd(update, context):
-    killingPhase = checkKillingPhase(update, context)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context)
+    if not eliminationPhase:
         return
     safe = checkSafetyBreaches(update, context)
     if not safe:
@@ -1234,11 +1244,11 @@ def stickCmd(update, context):
     if not stick:
         return
 
-    setState(username, StateEnum.kill)
+    setState(username, StateEnum.eliminate)
 
-    fullText = f"""You are about to use your stick to initiate a kill.
+    fullText = f"""You are about to use your stick to initiate an elimination.
 
-/stick should only be entered <b>once you have "killed" someone else in person.</b>
+/stick should only be entered <b>once you have "eliminated" someone else in person.</b>
 
 If you wish to <b>proceed</b>, type in the <b>telegram handle of the victim</b>
 
@@ -1246,7 +1256,7 @@ You must:
 1) type in their handle <b>exactly as is</b> (with caps, special characters etc.)
 2) <b>not put "@"</b> in front of their handle (eg. type in praveeeenk instead of @praveeeenk)
 
-If you wish to <b>cancel</b>, type in /cancelkill"""
+If you wish to <b>cancel</b>, type in /canceleliminate"""
     bot.send_message(chat_id=update.message.chat.id,
                      text=fullText,
                      parse_mode='HTML')
@@ -1259,7 +1269,7 @@ def checkImmunity(update, context, username):
         username, currentGame.currentRound)
     remainingTime = playerImmunityExpiry - currentTime
     if remainingTime > 0:
-        fullText = f"You are still immune for {remainingTime} seconds!\n\nYou may not be killed or kill!"
+        fullText = f"You are still immune for {remainingTime} seconds!\n\nYou may not be eliminated or eliminate!"
         bot.send_message(chat_id=userTracker[username]["chat_id"],
                          text=fullText,
                          parse_mode='HTML')
@@ -1301,7 +1311,7 @@ def checkVictimDying(update, context, username):
     if not victimDying:
         fullText = f"""Victim has not declared themselves dying!
 
-<b>Ask the victim to enter /dying</b> on their phone first! After which, you may type <b>/kill</b> again."""
+<b>Ask the victim to enter /dying</b> on their phone first! After which, you may type <b>/eliminate</b> again."""
         bot.send_message(chat_id=update.message.chat.id,
                          text=fullText,
                          parse_mode='HTML')
@@ -1350,12 +1360,12 @@ def rightKill(update, context, killerUsername, victimUsername):
     # Blast message to killer's faction
     killerFactionText = f"""<b>{factionsMap[str(killerFaction)]} Faction Update</b>
 
-{killerData[playerDataKeys.fullname]} (@{killerData[playerDataKeys.username]}) has <b>successfully killed</b> {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]})!
+{killerData[playerDataKeys.fullname]} (@{killerData[playerDataKeys.username]}) has <b>successfully eliminated</b> {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}) by sash/stick!
 
 Points added to faction bank: <b>{pointsToAdd}pts</b>
 Current faction bank balance: <b>{killerFactionData[factionDataKeys.bank]}pts</b>
 
-<b>Note:</b> The victim, {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}), is now <b>immune from kills</b> for the next {immuneSecondsUponDeath}s."""
+<b>Note:</b> The victim, {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}), is now <b>immune from eliminations</b> for the next {immuneSecondsUponDeath}s."""
     killerFactionMembers = userDb.getFactionMemberUsernames(
         killerFaction, currentGame.currentRound)
     for username in killerFactionMembers:
@@ -1369,9 +1379,9 @@ Current faction bank balance: <b>{killerFactionData[factionDataKeys.bank]}pts</b
     # Blast message to victim's faction
     victimFactionText = f"""<b>{factionsMap[str(victimFaction)]} Faction Update</b>
 
-{victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}) has been <b>killed</b>! Their points have been <b>reset to {minPoints}</b>.
+{victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}) has been <b>eliminated</b>! Their points have been <b>reset to {minPoints}</b>.
 
-<b>Note:</b> The victim, {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}), is now <b>immune from kills</b> for the next {immuneSecondsUponDeath}s."""
+<b>Note:</b> The victim, {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}), is now <b>immune from eliminations</b> for the next {immuneSecondsUponDeath}s."""
     victimFactionMembers = userDb.getFactionMemberUsernames(
         victimFaction, currentGame.currentRound)
     for username in victimFactionMembers:
@@ -1399,7 +1409,7 @@ def wrongKill(update, context, killerUsername, victimUsername):
 
 Ummmmmm...
 
-{killerFullname} (@{killerUsername}) tried to <b>wrongly kill</b> their faction mate, {victimFullname} (@{victimUsername})!
+{killerFullname} (@{killerUsername}) tried to <b>wrongly eliminated</b> their faction mate, {victimFullname} (@{victimUsername}) by sash/stick!
 
 Please settle your internal rivalry guys..."""
         killerFactionMembers = userDb.getFactionMemberUsernames(
@@ -1429,12 +1439,12 @@ Please settle your internal rivalry guys..."""
 
 BOOOOOOOOOOOOOOOOOO!
 
-{killerFullname} (@{killerUsername}) has <b>wrongly killed</b> {victimFullname} (@{victimUsername})!
+{killerFullname} (@{killerUsername}) has <b>wrongly eliminated</b> {victimFullname} (@{victimUsername})!
 
 Thus, <b>{wrongKillPenalty}pts</b> have been transferred from your faction bank to the victim's faction bank.
 Current faction bank balance: <b>{killerBankBalance}pts</b>
 
-Don't noob and anyhow kill can?"""
+Don't noob and anyhow eliminate can?"""
     killerFactionMembers = userDb.getFactionMemberUsernames(
         killerFaction, currentGame.currentRound)
     for username in killerFactionMembers:
@@ -1448,12 +1458,12 @@ Don't noob and anyhow kill can?"""
     # Blast message to victim's faction
     victimFactionText = f"""<b>{factionsMap[str(victimFaction)]} Faction Update</b>
 
-{victimFullname} (@{victimUsername}) has been <b>wrongly killed</b> by {killerFullname} (@{killerUsername})!
+{victimFullname} (@{victimUsername}) has been <b>wrongly eliminated</b> by {killerFullname} (@{killerUsername})!
 
-Thus, <b>{wrongKillPenalty}pts</b> have been transferred from the killer's faction bank to your faction bank.
+Thus, <b>{wrongKillPenalty}pts</b> have been transferred from the eliminater's faction bank to your faction bank.
 Current faction bank balance: <b>{victimBankBalance}pts</b>
 
-<b>Note:</b> The victim, {victimFullname} (@{victimUsername}), is NOT given immunity from kills."""
+<b>Note:</b> The victim, {victimFullname} (@{victimUsername}), is NOT given immunity from eliminations."""
     victimFactionMembers = userDb.getFactionMemberUsernames(
         victimFaction, currentGame.currentRound)
     for username in victimFactionMembers:
@@ -1468,8 +1478,8 @@ Current faction bank balance: <b>{victimBankBalance}pts</b>
 
 
 def visitSpyStationCmd(update, context):
-    killingPhase = checkKillingPhase(update, context)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context)
+    if not eliminationPhase:
         return
     safe = checkSafetyBreaches(update, context)
     if not safe:
@@ -1492,8 +1502,8 @@ Are you sure you are visiting the spy station?"""
 
 
 def handleVisitSpyStation(update, context, yesNo):
-    killingPhase = checkKillingPhase(update, context, callback=True)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context, callback=True)
+    if not eliminationPhase:
         return
     safe = checkSafetyBreaches(update, context, callback=True)
     if not safe:
@@ -1542,8 +1552,8 @@ def visitedSpyStation(update, context, username):
 
 
 def tier1aCmd(update, context):
-    killingPhase = checkKillingPhase(update, context)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context)
+    if not eliminationPhase:
         return
     username = update.message.chat.username
     gameMaster = checkGameMaster(update, context, username)
@@ -1565,8 +1575,8 @@ Please state the <b>ID of the faction</b> you are querying for.
 
 
 def handleTier1a(update, context, faction):
-    killingPhase = checkKillingPhase(update, context, callback=True)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context, callback=True)
+    if not eliminationPhase:
         return
     username = update.callback_query.message.chat.username
     gameMaster = checkGameMaster(update, context, username)
@@ -1594,8 +1604,8 @@ def handleTier1a(update, context, faction):
 
 
 def tier1bCmd(update, context):
-    killingPhase = checkKillingPhase(update, context)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context)
+    if not eliminationPhase:
         return
     username = update.message.chat.username
     gameMaster = checkGameMaster(update, context, username)
@@ -1617,8 +1627,8 @@ Please state the <b>ID of the faction</b> you are querying for.
 
 
 def handleTier1b(update, context, faction):
-    killingPhase = checkKillingPhase(update, context, callback=True)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context, callback=True)
+    if not eliminationPhase:
         return
     username = update.callback_query.message.chat.username
     gameMaster = checkGameMaster(update, context, username)
@@ -1670,8 +1680,8 @@ def handleTier1b(update, context, faction):
 
 
 def tier2aCmd(update, context):
-    killingPhase = checkKillingPhase(update, context)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context)
+    if not eliminationPhase:
         return
     username = update.message.chat.username
     gameMaster = checkGameMaster(update, context, username)
@@ -1693,8 +1703,8 @@ Please state the <b>ID of the faction</b> you are querying for.
 
 
 def handleTier2a(update, context, faction):
-    killingPhase = checkKillingPhase(update, context, callback=True)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context, callback=True)
+    if not eliminationPhase:
         return
     username = update.callback_query.message.chat.username
     gameMaster = checkGameMaster(update, context, username)
@@ -1715,8 +1725,8 @@ def handleTier2a(update, context, faction):
 
 
 def tier2bCmd(update, context):
-    killingPhase = checkKillingPhase(update, context)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context)
+    if not eliminationPhase:
         return
     username = update.message.chat.username
     gameMaster = checkGameMaster(update, context, username)
@@ -1738,8 +1748,8 @@ Please state the <b>ID of the faction</b> you are querying for.
 
 
 def handleTier2b(update, context, faction):
-    killingPhase = checkKillingPhase(update, context, callback=True)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context, callback=True)
+    if not eliminationPhase:
         return
     username = update.callback_query.message.chat.username
     gameMaster = checkGameMaster(update, context, username)
@@ -1791,8 +1801,8 @@ def handleTier2b(update, context, faction):
 
 
 def tier3aCmd(update, context):
-    killingPhase = checkKillingPhase(update, context)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context)
+    if not eliminationPhase:
         return
     username = update.message.chat.username
     gameMaster = checkGameMaster(update, context, username)
@@ -1801,7 +1811,7 @@ def tier3aCmd(update, context):
 
     fullText = f"""You are querying for:
 1) <b>The predator faction</b> of the requested faction AND
-2) The player from the predator faction with the <b>most kills</b>
+2) The player from the predator faction with the <b>most eliminations</b>
 
 Please state the <b>ID of the faction</b> you are querying for.
 
@@ -1816,8 +1826,8 @@ Please state the <b>ID of the faction</b> you are querying for.
 
 
 def handleTier3a(update, context, faction):
-    killingPhase = checkKillingPhase(update, context, callback=True)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context, callback=True)
+    if not eliminationPhase:
         return
     username = update.callback_query.message.chat.username
     gameMaster = checkGameMaster(update, context, username)
@@ -1835,7 +1845,7 @@ def handleTier3a(update, context, faction):
 
     gameMasterText = f"""<b>{factionsMap[str(predatorFaction)]} (ID: {predatorFaction})</b> is the predator faction of {factionsMap[str(faction)]}!
 
-The player in the predator faction with most kills is @{predatorMostKillsTuple[0]}, with {predatorMostKillsTuple[1][0]} kills.
+The player in the predator faction with most eliminations is @{predatorMostKillsTuple[0]}, with {predatorMostKillsTuple[1][0]} eliminations.
 
 ~ Shan Royale 2022 Team"""
     bot.edit_message_text(chat_id=update.callback_query.message.chat.id,
@@ -1845,8 +1855,8 @@ The player in the predator faction with most kills is @{predatorMostKillsTuple[0
 
 
 def tier3bCmd(update, context):
-    killingPhase = checkKillingPhase(update, context)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context)
+    if not eliminationPhase:
         return
     username = update.message.chat.username
     gameMaster = checkGameMaster(update, context, username)
@@ -1868,8 +1878,8 @@ Please state the <b>ID of the faction</b> you are querying for.
 
 
 def handleTier3b(update, context, faction):
-    killingPhase = checkKillingPhase(update, context, callback=True)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context, callback=True)
+    if not eliminationPhase:
         return
     username = update.callback_query.message.chat.username
     gameMaster = checkGameMaster(update, context, username)
@@ -1908,8 +1918,8 @@ def handleTier3b(update, context, faction):
 
 
 def giveStickCmd(update, context):
-    killingPhase = checkKillingPhase(update, context)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context)
+    if not eliminationPhase:
         return
     username = update.message.chat.username
     gameMaster = checkGameMaster(update, context, username)
@@ -1938,8 +1948,8 @@ If you wish to <b>cancel</b>, type in /cancelGiveStick"""
 def handleGiveStick(update, context, giveStickUsername):
     print(f"HANDLING GIVE STICK OF {giveStickUsername}")
     username = update.message.chat.username
-    killingPhase = checkKillingPhase(update, context)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context)
+    if not eliminationPhase:
         setState(username, None)
         return
     safe = checkSafetyBreaches(update, context)
@@ -1991,8 +2001,8 @@ def canGiveStick(update, context):
 
 
 def checkStickCmd(update, context):
-    killingPhase = checkKillingPhase(update, context)
-    if not killingPhase:
+    eliminationPhase = checkEliminationPhase(update, context)
+    if not eliminationPhase:
         return
     username = update.message.chat.username
     gameMaster = checkGameMaster(update, context, username)
@@ -2003,26 +2013,26 @@ def checkStickCmd(update, context):
         return
 
     fullText = f"""Sticks left for:
-Round 1 - {currentGame.stickRound1}
-Round 2 - {currentGame.stickRound2}"""
+Round 1 - {maxStickPerRound - currentGame.stickRound1}
+Round 2 - {maxStickPerRound - currentGame.stickRound2}"""
     bot.send_message(chat_id=update.message.chat.id,
                      text=fullText,
                      parse_mode='HTML')
 
 
-#TODO: Add in elimination tiers
-def eliminationCmd(update, context):
-    killingPhase = checkKillingPhase(update, context)
-    if not killingPhase:
+#TODO: Add in smite tiers
+def smiteCmd(update, context):
+    eliminationPhase = checkEliminationPhase(update, context)
+    if not eliminationPhase:
         return
     username = update.message.chat.username
     gameMaster = checkGameMaster(update, context, username)
     if not gameMaster:
         return
 
-    setState(username, StateEnum.elimination)
+    setState(username, StateEnum.smite)
 
-    fullText = f"""/elimination should only be entered when a player has <b>turned in the "death note"</b> at the spy station.
+    fullText = f"""/smite should only be entered when a player has <b>turned in the smite notes</b> at the spy station.
 
 If you wish to <b>proceed</b>, type in the <b>telegram handle of the victim</b>, as requested by the player.
 
@@ -2030,24 +2040,24 @@ You must:
 1) type in their handle <b>exactly as is</b> (with caps, special characters etc.)
 2) <b>not put "@"</b> in front of their handle (eg. type in praveeeenk instead of @praveeeenk)
 
-If you wish to <b>cancel</b>, type in /cancelElimination"""
+If you wish to <b>cancel</b>, type in /cancelsmite"""
     bot.send_message(chat_id=update.message.chat.id,
                      text=fullText,
                      parse_mode='HTML')
 
 
-def eliminationAskFaction(update, context, victimUsername):
-    killingPhase = checkKillingPhase(update, context)
-    if not killingPhase:
+def smiteAskFaction(update, context, victimUsername):
+    eliminationPhase = checkEliminationPhase(update, context)
+    if not eliminationPhase:
         return
     username = update.message.chat.username
     gameMaster = checkGameMaster(update, context, username)
     if not gameMaster:
         return
 
-    if victimUsername == "/cancelElimination":
+    if victimUsername == "/cancelsmite":
         setState(username, None)
-        fullText = f"Elimination has been cancelled\n\n{dontWasteMyTimeText}"
+        fullText = f"Smite has been cancelled\n\n{dontWasteMyTimeText}"
         bot.send_message(chat_id=userTracker[username]["chat_id"],
                          text=fullText,
                          parse_mode='HTML')
@@ -2058,9 +2068,9 @@ def eliminationAskFaction(update, context, victimUsername):
         return
 
     # Store victimUsername
-    userTracker[username]["elimination_target"] = victimUsername
+    userTracker[username]["smite_target"] = victimUsername
 
-    fullText = f"""Please state the <b>ID of the faction</b> of the player requesting the elimination.
+    fullText = f"""Please state the <b>ID of the faction</b> of the player requesting the smite.
 
 <b>Faction Legend:</b>"""
     for id, name in factionsMap.items():
@@ -2072,16 +2082,16 @@ def eliminationAskFaction(update, context, victimUsername):
                      parse_mode='HTML')
 
 
-def handleElimination(update, context, killerFaction):
+def handleSmite(update, context, killerFaction):
     username = update.callback_query.message.chat.username
-    victimUsername = userTracker[username]["elimination_target"]
+    victimUsername = userTracker[username]["smite_target"]
     if victimUsername == "":
         print(f"Victim Username is empty string! Request by {username}")
         return
 
-    print(f"HANDLING ELIMINATION OF {victimUsername}")
-    killingPhase = checkKillingPhase(update, context, callback=True)
-    if not killingPhase:
+    print(f"HANDLING SMITE OF {victimUsername}")
+    eliminationPhase = checkEliminationPhase(update, context, callback=True)
+    if not eliminationPhase:
         setState(username, None)
         return
     safe = checkSafetyBreaches(update, context, callback=True)
@@ -2089,21 +2099,21 @@ def handleElimination(update, context, killerFaction):
         setState(username, None)
         return
 
-    if victimUsername == "/cancelElimination":
+    if victimUsername == "/cancelsmite":
         setState(username, None)
-        fullText = f"Kill has been cancelled\n\n{dontWasteMyTimeText}"
+        fullText = f"Smite has been cancelled\n\n{dontWasteMyTimeText}"
         bot.send_message(chat_id=userTracker[username]["chat_id"],
                          text=fullText,
                          parse_mode='HTML')
         return
 
-    eliminationKill(update, context, killerFaction, victimUsername)
+    smiteKill(update, context, killerFaction, victimUsername)
 
-    userTracker[username]["elimination_target"] = ""
+    userTracker[username]["smite_target"] = ""
     setState(username, None)
 
 
-def eliminationKill(update, context, killerFaction, victimUsername):
+def smiteKill(update, context, killerFaction, victimUsername):
     username = update.callback_query.message.chat.username
     userDb = userTracker[username]["db"]
     victimData = userDb.getPlayerDataJSON(
@@ -2129,7 +2139,7 @@ def eliminationKill(update, context, killerFaction, victimUsername):
     # Blast message to killer's faction
     killerFactionText = f"""<b>{factionsMap[str(killerFaction)]} Faction Update</b>
 
-{victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}) has been <b>eliminated</b> by one of your faction members!!
+{victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}) has been <b>smited</b> by one of your faction members!!
 
 Points added to faction bank: <b>{pointsToAdd}pts</b>
 Current faction bank balance: <b>{killerFactionData[factionDataKeys.bank]}pts</b>."""
@@ -2146,11 +2156,11 @@ Current faction bank balance: <b>{killerFactionData[factionDataKeys.bank]}pts</b
     # Blast message to victim's faction
     victimFactionText = f"""<b>{factionsMap[str(victimFaction)]} Faction Update</b>
 
-{victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}) has been <b>eliminated</b> by {factionsMap[str(killerFaction)]} Faction!
+{victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}) has been <b>smited</b> by {factionsMap[str(killerFaction)]} Faction!
 
 Their points have been <b>reset to {minPoints}</b>.
 
-<b>Note:</b> The victim, {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}), is <b>NOT immune from subsequent kills</b>."""
+<b>Note:</b> The victim, {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}), is <b>NOT immune from subsequent eliminations</b>."""
     victimFactionMembers = userDb.getFactionMemberUsernames(
         victimFaction, currentGame.currentRound)
     for victimUsername in victimFactionMembers:
@@ -2164,11 +2174,11 @@ Their points have been <b>reset to {minPoints}</b>.
 
     GMtext = f"""<b>Gamemaster Update</b>
 
-{victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}) has been <b>eliminated</b> by {factionsMap[str(killerFaction)]} Faction!
+{victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}) has been <b>smited</b> by {factionsMap[str(killerFaction)]} Faction!
 
 Their points have been <b>reset to {minPoints}</b>.
 
-<b>Note:</b> The victim, {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}), is <b>NOT immune from subsequent kills</b>."""
+<b>Note:</b> The victim, {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}), is <b>NOT immune from subsequent eliminations</b>."""
     chat_id = userTracker[username]["chat_id"]
     bot.send_message(chat_id=chat_id,
                         text=GMtext,
@@ -2184,14 +2194,14 @@ def mainMessageHandler(update, context):
     if currentState == StateEnum.setPoints:
         handleSetPoints(update, context, text)
         return
-    elif currentState == StateEnum.kill:
+    elif currentState == StateEnum.eliminate:
         handleKill(update, context, text)
         return
     elif currentState == StateEnum.giveStick:
         handleGiveStick(update, context, text)
         return
-    elif currentState == StateEnum.elimination:
-        eliminationAskFaction(update, context, text)
+    elif currentState == StateEnum.smite:
+        smiteAskFaction(update, context, text)
         return
     elif currentState == StateEnum.adminAddPoints:
         handleAdminAddPoints(update, context, text)
@@ -2250,7 +2260,7 @@ def mainCallBackHandler(update, context):
         handleTier3b(update, context, value)
         return
     if optionID == str(OptionIDEnum.eliminationAskFaction):
-        handleElimination(update, context, value)
+        handleSmite(update, context, value)
         return
     if optionID == str(OptionIDEnum.adminAddPoints):
         askAdminAddPoints(update, context, value)
@@ -2275,13 +2285,13 @@ def checkSetPointsPhase(update, context):
     return True
 
 
-def checkKillingPhase(update, context, callback=False):
+def checkEliminationPhase(update, context, callback=False):
     if callback:
         chat_id = update.callback_query.message.chat.id
     else:
         chat_id = update.message.chat.id
     if (not currentGame.play) or (not currentGame.killEnabled):
-        fullText = f"Killing phase has not started yet!\n\n{dontWasteMyTimeText}"
+        fullText = f"Elimination phase has not started yet!\n\n{dontWasteMyTimeText}"
         bot.send_message(chat_id= chat_id,
                          text = fullText,
                          parse_mode = 'HTML')
@@ -2435,6 +2445,8 @@ def main():
     dp.add_handler(CommandHandler("adminfactiondetails", adminFactionDetails))
     dp.add_handler(CommandHandler("adminaddpoints", adminAddPoints))
     dp.add_handler(CommandHandler("adminbroadcast", adminBroadcast))
+    # dp.add_handler(CommandHandler("adminpause", adminPause))
+    # dp.add_handler(CommandHandler("adminresume", adminResume))
 
     # Player commands - general
     dp.add_handler(CommandHandler("start", startCmd))
@@ -2446,9 +2458,9 @@ def main():
     dp.add_handler(CommandHandler("setpoints", setPointsCmd))
     dp.add_handler(CommandHandler("listpoints", listPointsCmd))
 
-    # Player commands - killing phase
+    # Player commands - elimination phase
     dp.add_handler(CommandHandler("dying", dyingCmd))
-    dp.add_handler(CommandHandler("kill", killCmd))
+    dp.add_handler(CommandHandler("eliminate", killCmd))
     dp.add_handler(CommandHandler("stick", stickCmd))
 
     # Player commands - spystation
@@ -2463,7 +2475,7 @@ def main():
     dp.add_handler(CommandHandler("tier3b", tier3bCmd))
     dp.add_handler(CommandHandler("givestick", giveStickCmd))
     dp.add_handler(CommandHandler("checkstick", checkStickCmd))
-    dp.add_handler(CommandHandler("elimination", eliminationCmd))
+    dp.add_handler(CommandHandler("smite", smiteCmd))
 
     # Safety commands
     dp.add_handler(CommandHandler("yellowcard", yellowCardCmd))
