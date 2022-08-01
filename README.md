@@ -11,6 +11,9 @@
 - printerror messages to PRAVEEN
 - wesley did /setpoints <points>
 - add playing area picture
+- Put greenpass during visit spystation
+- change spystation to information centre
+- add more pics!!
 
 # MUST DRY RUN
 - Pause, Restart (MUST COMMENT OUT PURGE, SETUP, AND LOADING DATA)

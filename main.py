@@ -28,7 +28,7 @@ if API_KEY == None:
 
 # Excel to Database
 # TODO: CHANGE TO ACTUAL EXCEL SHEET
-excelFilePath = "./excel/shanRoyale2022Data1.xlsx"
+excelFilePath = "./excel/test/shanRoyale2022Data1.xlsx"
 playerDataRound1JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="playerDataRound1").to_json(orient='records'))
 playerDataRound2JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="playerDataRound2").to_json(orient='records'))
 factionDataJSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name="factionData").to_json(orient='records'))
@@ -47,13 +47,19 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
-# Saving excel file paths
-saveStateExcelFilePath = "./excel/backup/shanRoyale2022Data.xlsx"
+# Backup Excel file paths
+saveStateExcelFilePath = "./excel/backup/ShanRoyale2022DataBackup.xlsx"
 
 # Initialise bot
 bot = telebot.TeleBot(API_KEY, parse_mode=None)
 
 # ============================Constants======================================
+# excel sheet names
+playerDataRound1SheetName = "playerDataRound1"
+playerDataRound2SheetName = "playerDataRound2"
+factionDataSheetName = "factionData"
+
+
 roundList = [1, 2]
 yesNoList = ["Yes", "No"]
 
@@ -153,10 +159,17 @@ def makeInlineKeyboard(lst, optionID):
 # ============================DB to file converters?===========================
 
 def saveGameState():
-    userTrackerJSON = pandas.read_json(userTracker)
-    adminQueryJSON = pandas.read_json(adminQuery)
-    
-    databaseJSON.to_excel(excel_file_string)
+    allPlayerData1Dict = mainDb.getALLPlayerDataJSON(1)
+    allPlayerData2Dict = mainDb.getALLPlayerDataJSON(2)
+    allFactionDataDict = mainDb.getALLFactionDataJSON()
+
+    allPlayerData1JSON = pandas.DataFrame.from_dict(allPlayerData1Dict, orient="index")
+    allPlayerData2JSON = pandas.DataFrame.from_dict(allPlayerData2Dict, orient="index")
+    allFactionDataJSON = pandas.DataFrame.from_dict(allFactionDataDict, orient="index")
+    with pandas.ExcelWriter(saveStateExcelFilePath) as writer:  
+        allPlayerData1JSON.to_excel(writer, sheet_name=playerDataRound1SheetName)
+        allPlayerData2JSON.to_excel(writer, sheet_name=playerDataRound2SheetName)
+        allFactionDataJSON.to_excel(writer, sheet_name=factionDataSheetName)
     return
 
 def reloadGameState():
@@ -2281,6 +2294,9 @@ def blastMessageToAll(text):
 # ===================Main Method============================
 
 def main():
+    #TODO: REMOVE
+    saveGameState()
+
     # Start the bot.
     # Create the Updater and pass it your bot's token.
     # Make sure to set use_context=True to use the new context based callbacks

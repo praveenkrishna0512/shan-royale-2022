@@ -193,6 +193,14 @@ class DBHelper:
         for dataTuple in self.conn.execute(stmt, args):
             return self.factionDataDBtoJSON(list(dataTuple))
 
+    def getALLFactionDataJSON(self):
+        stmt = f"SELECT * FROM {self.factionTable}"
+        allFactionJSON = {}
+        for dataTuple in self.conn.execute(stmt):
+            factionDataJSON = self.factionDataDBtoJSON(list(dataTuple))
+            faction = factionDataJSON[factionDataKeys.faction]
+            allFactionJSON[faction] = factionDataJSON
+        return allFactionJSON 
 
     # ==============================Username Queries===========================
     # (Returns True if user exists)
