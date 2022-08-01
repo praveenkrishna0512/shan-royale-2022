@@ -86,6 +86,8 @@ factionsMap = {
     "3": "Aphrodite",
     "4": "Nemesis"
 }
+playAreaImagePath = "./images/shan-royale-playarea-round-"
+imageExtension = ".jpg"
 
 # TODO: UPDATE
 admins = ["praveeeenk", "Casperplz"]
@@ -103,11 +105,11 @@ immuneSecondsUponDeath = 90
 wrongKillPenalty = 50
 
 # TODO: ASK CASPER IF OKAY, INFORM CASPER IF NEED BE SHORTER
-tier1bNumToSelect = 2
-tier1bTopCut = 5
-tier2bNumToSelect = 10
-tier2bTopCut = 5
-tier3bNumToSelect = 3
+easyPreyNumToSelect = 2
+easyPreyTopCut = 5
+mediumPreyNumToSelect = 10
+mediumPreyTopCut = 5
+hardPreyNumToSelect = 3
 maxStickPerRound = 10
 stickExpiryInSecs = 600
 
@@ -130,18 +132,18 @@ class StateEnum(enum.Enum):
     redCard = "redCard"
 
 
-class OptionIDEnum(enum.Enum):
+class OptionIDEnum(enum.Enum): 
     beginRound = "beginRound"
     endSetPoints = "endSetPoints"
     endRound = "endRound"
     dying = "dying"
-    visitSpyStation = "visitSpyStation"
-    tier1a = "tier1a"
-    tier1b = "tier1b"
-    tier2a = "tier2a"
-    tier2b = "tier2b"
-    tier3a = "tier3a"
-    tier3b = "tier3b"
+    visitInfoCentre = "visitInfoCentre"
+    easyPredator = "easyPredator"
+    easyPrey = "easyPrey"
+    mediumPredator = "mediumPredator"
+    mediumPrey = "mediumPrey"
+    hardPredator = "hardPredator"
+    hardPrey = "hardPrey"
     eliminationAskFaction = "eliminationAskFaction"
     adminAddPoints = "adminAddPoints"
     adminBroadcast = "adminBroadcast"
@@ -261,7 +263,8 @@ def makeInlineKeyboard(lst, optionID):
 # ============================DB to file converters?===========================
 
 def saveGameState():
-    print(f"SAVING GAME STATE AT: {time.localtime()}")
+    currentTime = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+    print(f"SAVING GAME STATE AT: {currentTime}")
     allPlayerData1Dict = mainDb.getALLPlayerDataJSON(1)
     allPlayerData2Dict = mainDb.getALLPlayerDataJSON(2)
     allFactionDataDict = mainDb.getALLFactionDataJSON()
@@ -295,7 +298,9 @@ def saveGameState():
     gameDataJSON = pandas.DataFrame.from_dict(gameDataDict, orient="index")
     userTrackerJSON = pandas.DataFrame.from_dict(dummyTrackerDict, orient="index")
     adminQueryJSON = pandas.DataFrame.from_dict(dummyAdminDict, orient="index")
-    with pandas.ExcelWriter(excelFilePath) as writer:
+
+    saveFilePath = f"./excel/backup/shanRoyale2022-{currentTime}.xlsx"
+    with pandas.ExcelWriter(saveFilePath) as writer:
         allPlayerData1JSON.to_excel(writer, sheet_name=SheetName.playerDataRound1)
         allPlayerData2JSON.to_excel(writer, sheet_name=SheetName.playerDataRound2)
         allFactionDataJSON.to_excel(writer, sheet_name=SheetName.factionData)
@@ -347,6 +352,7 @@ You are now in the <b>Set Points</b> phase
 
 Enjoy!"""
     blastMessageToAll(blastText)
+    blastImageToAll(f"{playAreaImagePath}{round_no}{imageExtension}")
 
 
 def adminEndSetPointsCmd(update, context):
@@ -411,13 +417,14 @@ You are now in the <b>Elimination</b> phase
 <b>Details of phase:</b>
 - Duration: <b>45 mins</b>
 - Your target Faction is <b>{targetFaction}</b>
-- Picture of play area is attached!
+- <b>Picture of play area is attached!</b>
 
 Stay safe while playing! Don't run on stairs + high areas and not into people. Remember that this is <b>just a game</b>\n
 Enjoy!"""
         bot.send_message(chat_id=user["chat_id"],
                          text=text,
                          parse_mode='HTML')
+    blastImageToAll(f"{playAreaImagePath}{currentGame.currentRound}{imageExtension}")
 
 
 def adminEndRoundCmd(update, context):
@@ -857,16 +864,16 @@ def helpCmd(update, context):
 <b>/dying</b> - Set yourself as dying
 <b>/eliminate</b> - Initiate an elimination on someone
 <b>/stick</b> - Use your stick to initiate an elimination on someone
-<b>/visitspystation</b> - Record your visit to the spy station
+<b>/visitinfocentre</b> - Record your visit to the information centre
 """
 
     gamemasterCmds = """<b>Here are the suppported game master commands:</b>\n
-<b>/tier1a</b> - Get Tier 1a information
-<b>/tier1b</b> - Get Tier 1b information
-<b>/tier2a</b> - Get Tier 2a information
-<b>/tier2b</b> - Get Tier 2b information
-<b>/tier3a</b> - Get Tier 3a information
-<b>/tier3b</b> - Get Tier 3b information
+<b>/easyPredator</b> - Get easy predator information
+<b>/easyPrey</b> - Get easy prey information
+<b>/mediumPredator</b> - Get medium predator information
+<b>/mediumPrey</b> - Get medium prey information
+<b>/hardPredator</b> - Get hard predator information
+<b>/hardPrey</b> - Get hard prey information
 <b>/givestick</b> - Give stick to a player
 <b>/checkstick</b> - Check how many sticks have been given out
 <b>/smite</b> - Smite a player upon request
@@ -1477,7 +1484,7 @@ Current faction bank balance: <b>{victimBankBalance}pts</b>
 # =========================Spystation Mechanism================================
 
 
-def visitSpyStationCmd(update, context):
+def visitInfoCentreCmd(update, context):
     eliminationPhase = checkEliminationPhase(update, context)
     if not eliminationPhase:
         return
@@ -1485,23 +1492,23 @@ def visitSpyStationCmd(update, context):
     if not safe:
         return
     username = update.message.chat.username
-    visited = visitedSpyStation(update, context, username)
+    visited = visitedInfoCentre(update, context, username)
     if visited:
         return
 
-    fullText = f"""/visitSpyStation should only be entered <b>once you are going to engage with the game master at the spy station</b>
+    fullText = f"""/visitInfoCentre should only be entered <b>once you are going to engage with the game master at the information centre</b>
 
-You may only visit the spy station <b>once per round</b>.
+You may only visit the information centre <b>once per round</b>.
 
-Are you sure you are visiting the spy station?"""
+Are you sure you are visiting the information centre?"""
     bot.send_message(chat_id=update.message.chat.id,
                      text=fullText,
                      reply_markup=makeInlineKeyboard(
-                         yesNoList, OptionIDEnum.visitSpyStation),
+                         yesNoList, OptionIDEnum.visitInfoCentre),
                      parse_mode='HTML')
 
 
-def handleVisitSpyStation(update, context, yesNo):
+def handleVisitInfoCentre(update, context, yesNo):
     eliminationPhase = checkEliminationPhase(update, context, callback=True)
     if not eliminationPhase:
         return
@@ -1524,7 +1531,7 @@ def handleVisitSpyStation(update, context, yesNo):
     userDb.setPlayerVisitSpyStation(username, currentGame.currentRound, True)
     playerFaction = userDb.getPlayerFaction(username, currentGame.currentRound)
 
-    fullText = f"""<b>You (@{username}) have registered yourself at the Spy Station</b>
+    fullText = f"""<b>You (@{username}) have registered yourself at the Info Centre</b>
 
 Faction Name (ID): {factionsMap[str(playerFaction)]} ({playerFaction})
 
@@ -1533,15 +1540,17 @@ Show this pass to the game master to proceed with the station activities."""
                           text=fullText,
                           message_id=message_id,
                           parse_mode='HTML')
+    bot.send_photo(chat_id=chat_id,
+                         photo=open("./images/green-pass.jpg", 'rb'))
 
 
-def visitedSpyStation(update, context, username):
+def visitedInfoCentre(update, context, username):
     userDb = userTracker[username]["db"]
-    visitedSpyStation = userDb.getPlayerVisitSpyStation(
+    visitedInfoCentre = userDb.getPlayerVisitSpyStation(
         username, currentGame.currentRound)
 
-    if visitedSpyStation:
-        fullText = f"""You have visited the spy station in this round!\n\n{dontWasteMyTimeText}"""
+    if visitedInfoCentre:
+        fullText = f"""You have visited the information centre in this round!\n\n{dontWasteMyTimeText}"""
         bot.send_message(chat_id=update.message.chat.id,
                          text=fullText,
                          parse_mode='HTML')
@@ -1551,7 +1560,7 @@ def visitedSpyStation(update, context, username):
 # ========================Spy Master Commands==================================
 
 
-def tier1aCmd(update, context):
+def easyPredatorCmd(update, context):
     eliminationPhase = checkEliminationPhase(update, context)
     if not eliminationPhase:
         return
@@ -1570,11 +1579,11 @@ Please state the <b>ID of the faction</b> you are querying for.
     bot.send_message(chat_id=update.message.chat.id,
                      text=fullText,
                      reply_markup=makeInlineKeyboard(
-                         factionsMap.keys(), OptionIDEnum.tier1a),
+                         factionsMap.keys(), OptionIDEnum.easyPredator),
                      parse_mode='HTML')
 
 
-def handleTier1a(update, context, faction):
+def handleEasyPredator(update, context, faction):
     eliminationPhase = checkEliminationPhase(update, context, callback=True)
     if not eliminationPhase:
         return
@@ -1603,7 +1612,7 @@ def handleTier1a(update, context, faction):
                           parse_mode='HTML')
 
 
-def tier1bCmd(update, context):
+def easyPreyCmd(update, context):
     eliminationPhase = checkEliminationPhase(update, context)
     if not eliminationPhase:
         return
@@ -1612,7 +1621,7 @@ def tier1bCmd(update, context):
     if not gameMaster:
         return
 
-    fullText = f"""You are querying for <b>{tier1bNumToSelect} people from the prey faction</b> of the requested faction, who <b>do not</b> possess the most number of points.
+    fullText = f"""You are querying for <b>{easyPreyNumToSelect} people from the prey faction</b> of the requested faction, who <b>do not</b> possess the most number of points.
 
 Please state the <b>ID of the faction</b> you are querying for.
 
@@ -1622,11 +1631,11 @@ Please state the <b>ID of the faction</b> you are querying for.
     bot.send_message(chat_id=update.message.chat.id,
                      text=fullText,
                      reply_markup=makeInlineKeyboard(
-                         factionsMap.keys(), OptionIDEnum.tier1b),
+                         factionsMap.keys(), OptionIDEnum.easyPrey),
                      parse_mode='HTML')
 
 
-def handleTier1b(update, context, faction):
+def handleEasyPrey(update, context, faction):
     eliminationPhase = checkEliminationPhase(update, context, callback=True)
     if not eliminationPhase:
         return
@@ -1644,13 +1653,13 @@ def handleTier1b(update, context, faction):
                        key=lambda memberPoints: memberPoints[1], reverse=True)
     print(f"Tier 1b Prey Faction Arr: {sortedArr}")
 
-    numPreyLeft = len(sortedArr) - tier1bTopCut
+    numPreyLeft = len(sortedArr) - easyPreyTopCut
     if numPreyLeft <= 0:
-        print("ERROR: TOO LITTLE PREY LEFT ")
+        print("ERROR: TOO LITTLE PREY LEFT")
         return
 
-    if numPreyLeft > tier1bNumToSelect:
-        numPreyToSelect = tier1bNumToSelect
+    if numPreyLeft > easyPreyNumToSelect:
+        numPreyToSelect = easyPreyNumToSelect
     else:
         numPreyToSelect = numPreyLeft
 
@@ -1658,9 +1667,9 @@ def handleTier1b(update, context, faction):
     # TODO: If num left < tier1bTopCut, this results in a loop
     randomNumArray = []
     for i in range(numPreyToSelect):
-        random_num = random.randint(tier1bTopCut, numPreyToSelect)
+        random_num = random.randint(easyPreyTopCut, numPreyToSelect)
         while random_num in randomNumArray:
-            random_num = random.randint(tier1bTopCut, numPreyToSelect)
+            random_num = random.randint(easyPreyTopCut, numPreyToSelect)
         randomNumArray.append(random_num)
     print(randomNumArray)
 
@@ -1679,7 +1688,7 @@ def handleTier1b(update, context, faction):
                           parse_mode='HTML')
 
 
-def tier2aCmd(update, context):
+def mediumPredatorCmd(update, context):
     eliminationPhase = checkEliminationPhase(update, context)
     if not eliminationPhase:
         return
@@ -1698,11 +1707,11 @@ Please state the <b>ID of the faction</b> you are querying for.
     bot.send_message(chat_id=update.message.chat.id,
                      text=fullText,
                      reply_markup=makeInlineKeyboard(
-                         factionsMap.keys(), OptionIDEnum.tier2a),
+                         factionsMap.keys(), OptionIDEnum.mediumPredator),
                      parse_mode='HTML')
 
 
-def handleTier2a(update, context, faction):
+def handleMediumPredator(update, context, faction):
     eliminationPhase = checkEliminationPhase(update, context, callback=True)
     if not eliminationPhase:
         return
@@ -1724,7 +1733,7 @@ def handleTier2a(update, context, faction):
                           parse_mode='HTML')
 
 
-def tier2bCmd(update, context):
+def mediumPreyCmd(update, context):
     eliminationPhase = checkEliminationPhase(update, context)
     if not eliminationPhase:
         return
@@ -1733,7 +1742,7 @@ def tier2bCmd(update, context):
     if not gameMaster:
         return
 
-    fullText = f"""You are querying for <b>{tier2bNumToSelect} people from the prey faction</b> of the requested faction, who <b>do not</b> possess the most number of points.
+    fullText = f"""You are querying for <b>{mediumPreyNumToSelect} people from the prey faction</b> of the requested faction, who <b>do not</b> possess the most number of points.
 
 Please state the <b>ID of the faction</b> you are querying for.
 
@@ -1743,11 +1752,11 @@ Please state the <b>ID of the faction</b> you are querying for.
     bot.send_message(chat_id=update.message.chat.id,
                      text=fullText,
                      reply_markup=makeInlineKeyboard(
-                         factionsMap.keys(), OptionIDEnum.tier2b),
+                         factionsMap.keys(), OptionIDEnum.mediumPrey),
                      parse_mode='HTML')
 
 
-def handleTier2b(update, context, faction):
+def handleMediumPrey(update, context, faction):
     eliminationPhase = checkEliminationPhase(update, context, callback=True)
     if not eliminationPhase:
         return
@@ -1765,13 +1774,13 @@ def handleTier2b(update, context, faction):
                        key=lambda memberPoints: memberPoints[1], reverse=True)
     print(f"Tier 2b Prey Faction Arr: {sortedArr}")
 
-    numPreyLeft = len(sortedArr) - tier2bTopCut
+    numPreyLeft = len(sortedArr) - mediumPreyTopCut
     if numPreyLeft <= 0:
         print("ERROR: TOO LITTLE PREY LEFT ")
         return
 
-    if numPreyLeft > tier2bNumToSelect:
-        numPreyToSelect = tier2bNumToSelect
+    if numPreyLeft > mediumPreyNumToSelect:
+        numPreyToSelect = mediumPreyNumToSelect
     else:
         numPreyToSelect = numPreyLeft
 
@@ -1779,9 +1788,9 @@ def handleTier2b(update, context, faction):
     # TODO: If num left < tier1bTopCut, this results in a loop
     randomNumArray = []
     for i in range(numPreyToSelect):
-        random_num = random.randint(tier2bTopCut, numPreyToSelect)
+        random_num = random.randint(mediumPreyTopCut, numPreyToSelect)
         while random_num in randomNumArray:
-            random_num = random.randint(tier2bTopCut, numPreyToSelect)
+            random_num = random.randint(mediumPreyTopCut, numPreyToSelect)
         randomNumArray.append(random_num)
     print(randomNumArray)
 
@@ -1800,7 +1809,7 @@ def handleTier2b(update, context, faction):
                           parse_mode='HTML')
 
 
-def tier3aCmd(update, context):
+def hardPredatorCmd(update, context):
     eliminationPhase = checkEliminationPhase(update, context)
     if not eliminationPhase:
         return
@@ -1821,11 +1830,11 @@ Please state the <b>ID of the faction</b> you are querying for.
     bot.send_message(chat_id=update.message.chat.id,
                      text=fullText,
                      reply_markup=makeInlineKeyboard(
-                         factionsMap.keys(), OptionIDEnum.tier3a),
+                         factionsMap.keys(), OptionIDEnum.hardPredator),
                      parse_mode='HTML')
 
 
-def handleTier3a(update, context, faction):
+def handleHardPredator(update, context, faction):
     eliminationPhase = checkEliminationPhase(update, context, callback=True)
     if not eliminationPhase:
         return
@@ -1854,7 +1863,7 @@ The player in the predator faction with most eliminations is @{predatorMostKills
                           parse_mode='HTML')
 
 
-def tier3bCmd(update, context):
+def hardPreyCmd(update, context):
     eliminationPhase = checkEliminationPhase(update, context)
     if not eliminationPhase:
         return
@@ -1863,7 +1872,7 @@ def tier3bCmd(update, context):
     if not gameMaster:
         return
 
-    fullText = f"""You are querying for <b>{tier3bNumToSelect} people from the prey faction</b> of the requested faction, who possess the <b>most number of points</b>.
+    fullText = f"""You are querying for <b>{hardPreyNumToSelect} people from the prey faction</b> of the requested faction, who possess the <b>most number of points</b>.
 
 Please state the <b>ID of the faction</b> you are querying for.
 
@@ -1873,11 +1882,11 @@ Please state the <b>ID of the faction</b> you are querying for.
     bot.send_message(chat_id=update.message.chat.id,
                      text=fullText,
                      reply_markup=makeInlineKeyboard(
-                         factionsMap.keys(), OptionIDEnum.tier3b),
+                         factionsMap.keys(), OptionIDEnum.hardPrey),
                      parse_mode='HTML')
 
 
-def handleTier3b(update, context, faction):
+def handleHardPrey(update, context, faction):
     eliminationPhase = checkEliminationPhase(update, context, callback=True)
     if not eliminationPhase:
         return
@@ -1895,8 +1904,8 @@ def handleTier3b(update, context, faction):
                        key=lambda memberPoints: memberPoints[1], reverse=True)
     print(f"Tier 3b Prey Faction Arr: {sortedArr}")
 
-    numPreyToSelect = tier3bNumToSelect
-    if len(sortedArr) <= tier3bNumToSelect:
+    numPreyToSelect = hardPreyNumToSelect
+    if len(sortedArr) <= hardPreyNumToSelect:
         numPreyToSelect = len(sortedArr)
 
     indexArray = [x for x in range(numPreyToSelect)]
@@ -1931,7 +1940,7 @@ def giveStickCmd(update, context):
 
     setState(username, StateEnum.giveStick)
 
-    fullText = f"""/giveStick should only be entered when the player has <b>completed their required task at the spy station.</b>
+    fullText = f"""/giveStick should only be entered when the player has <b>completed their required task at the information centre.</b>
 
 If you wish to <b>proceed</b>, type in the <b>telegram handle of the victim</b>
 
@@ -2032,7 +2041,7 @@ def smiteCmd(update, context):
 
     setState(username, StateEnum.smite)
 
-    fullText = f"""/smite should only be entered when a player has <b>turned in the smite notes</b> at the spy station.
+    fullText = f"""/smite should only be entered when a player has <b>turned in the smite notes</b> at the information centre.
 
 If you wish to <b>proceed</b>, type in the <b>telegram handle of the victim</b>, as requested by the player.
 
@@ -2238,26 +2247,26 @@ def mainCallBackHandler(update, context):
     if optionID == str(OptionIDEnum.dying):
         handleDying(update, context, value)
         return
-    if optionID == str(OptionIDEnum.visitSpyStation):
-        handleVisitSpyStation(update, context, value)
+    if optionID == str(OptionIDEnum.visitInfoCentre):
+        handleVisitInfoCentre(update, context, value)
         return
-    if optionID == str(OptionIDEnum.tier1a):
-        handleTier1a(update, context, value)
+    if optionID == str(OptionIDEnum.easyPredator):
+        handleEasyPredator(update, context, value)
         return
-    if optionID == str(OptionIDEnum.tier1b):
-        handleTier1b(update, context, value)
+    if optionID == str(OptionIDEnum.easyPrey):
+        handleEasyPrey(update, context, value)
         return
-    if optionID == str(OptionIDEnum.tier2a):
-        handleTier2a(update, context, value)
+    if optionID == str(OptionIDEnum.mediumPredator):
+        handleMediumPredator(update, context, value)
         return
-    if optionID == str(OptionIDEnum.tier2b):
-        handleTier2b(update, context, value)
+    if optionID == str(OptionIDEnum.mediumPrey):
+        handleMediumPrey(update, context, value)
         return
-    if optionID == str(OptionIDEnum.tier3a):
-        handleTier3a(update, context, value)
+    if optionID == str(OptionIDEnum.hardPredator):
+        handleHardPredator(update, context, value)
         return
-    if optionID == str(OptionIDEnum.tier3b):
-        handleTier3b(update, context, value)
+    if optionID == str(OptionIDEnum.hardPrey):
+        handleHardPrey(update, context, value)
         return
     if optionID == str(OptionIDEnum.eliminationAskFaction):
         handleSmite(update, context, value)
@@ -2425,6 +2434,11 @@ def blastMessageToAll(text):
                          text = text,
                          parse_mode = 'HTML')
 
+def blastImageToAll(path):
+    for user in userTracker.values():
+        bot.send_photo(chat_id= user["chat_id"],
+                         photo=open(path, 'rb'))
+
 # ===================Main Method============================
 
 def main():
@@ -2463,16 +2477,16 @@ def main():
     dp.add_handler(CommandHandler("eliminate", killCmd))
     dp.add_handler(CommandHandler("stick", stickCmd))
 
-    # Player commands - spystation
-    dp.add_handler(CommandHandler("visitspystation", visitSpyStationCmd))
+    # Player commands - info centre (aka spystation)
+    dp.add_handler(CommandHandler("visitInfoCentre", visitInfoCentreCmd))
 
-    # Game Master commands - spystation
-    dp.add_handler(CommandHandler("tier1a", tier1aCmd))
-    dp.add_handler(CommandHandler("tier1b", tier1bCmd))
-    dp.add_handler(CommandHandler("tier2a", tier2aCmd))
-    dp.add_handler(CommandHandler("tier2b", tier2bCmd))
-    dp.add_handler(CommandHandler("tier3a", tier3aCmd))
-    dp.add_handler(CommandHandler("tier3b", tier3bCmd))
+    # Game Master commands - info centre (aka spystation)
+    dp.add_handler(CommandHandler("easyPredator", easyPredatorCmd))
+    dp.add_handler(CommandHandler("easyPrey", easyPreyCmd))
+    dp.add_handler(CommandHandler("mediumPredator", mediumPredatorCmd))
+    dp.add_handler(CommandHandler("mediumPrey", mediumPreyCmd))
+    dp.add_handler(CommandHandler("hardPredator", hardPredatorCmd))
+    dp.add_handler(CommandHandler("hardPrey", hardPreyCmd))
     dp.add_handler(CommandHandler("givestick", giveStickCmd))
     dp.add_handler(CommandHandler("checkstick", checkStickCmd))
     dp.add_handler(CommandHandler("smite", smiteCmd))

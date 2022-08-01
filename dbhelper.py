@@ -78,8 +78,8 @@ class DBHelper:
             deathCount INTEGER DEFAULT 0,
             killCount INTEGER DEFAULT 0,
             visitSpyStation BOOL DEFAULT 0,
-            stickExpiry TIMESTAMP,
-            immunityExpiry TIMESTAMP,
+            stickExpiry BIGINT DEFAULT 0,
+            immunityExpiry BIGINT DEFAULT 0,
             safetyBreaches INTEGER DEFAULT 0
         )"""
         factionDataStmt = f"""CREATE TABLE IF NOT EXISTS {self.factionTable} ( 
