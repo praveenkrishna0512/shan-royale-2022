@@ -3,7 +3,7 @@
 ## Feedback
 - database is locked: eliminate got issue
 - Admin pause game/resume game?
-- three elimination commands
+- change command descriptions
 
 
 # Should i do?
@@ -13,6 +13,7 @@
 
 # MUST DRY RUN
 - Pause, Restart (MUST COMMENT OUT PURGE, SETUP, AND LOADING DATA)
+- three elimination commands
 
 
 # DONE TASKS
