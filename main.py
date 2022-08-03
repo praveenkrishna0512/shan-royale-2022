@@ -82,8 +82,6 @@ class SheetName:
 roundList = [1, 2]
 yesNoList = ["Yes", "No"]
 
-# TODO: LOAD UPON RESUME
-
 factionsMap = {
     "1": "Sparta",
     "2": "Hades",
@@ -98,10 +96,6 @@ imageExtension = ".jpg"
 admins = ["praveeeenk", "Casperplz"]
 gameMasters = ["buttermebuns", "vigonometry", "kelsomebody", "jacindatsen", "keziakhoo", "jodytng"]
 safetyOfficers = ["kelsykoh", "ddannyiel", "Jobeet"]
-
-# TODO: LOAD UPON RESUME
-# "username": { <state>: <text> }
-adminQuery = {}
 
 minPoints = 5
 maxTeamPoints = 200
@@ -154,24 +148,15 @@ class OptionIDEnum(enum.Enum):
     adminBroadcast = "adminBroadcast"
     smiteAskTier = "smiteAskTier"
 
-# Handles state of the bot for each user
-# Key: username
-# Value: dynamic dictionary
-# <username>: { "state": , "db": , "chat_id": , "smite_target": ,}
-# TODO: LOAD UPON RESUME
-userTracker = {}
-
-
-
 # ======================LOAD GAME STATE================================
 # TODO: CHANGE TO ACTUAL EXCEL SHEET
-excelFilePath = "./excel/test/shanRoyale2022Data1.xlsx"
-playerDataRound1JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name=SheetName.playerDataRound1).to_json(orient='records'))
-playerDataRound2JSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name=SheetName.playerDataRound2).to_json(orient='records'))
-factionDataJSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name=SheetName.factionData).to_json(orient='records'))
-gameDataJSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name=SheetName.gameData).to_json(orient='records'))
-userTrackerDataJSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name=SheetName.userTrackerData).to_json(orient='records'))
-adminQueryDataJSONArr = json.loads(pandas.read_excel(excelFilePath, sheet_name=SheetName.adminQueryData).to_json(orient='records'))
+liveExcelFilePath = "./excel/test/shanRoyale2022Data1.xlsx"
+playerDataRound1JSONArr = json.loads(pandas.read_excel(liveExcelFilePath, sheet_name=SheetName.playerDataRound1).to_json(orient='records'))
+playerDataRound2JSONArr = json.loads(pandas.read_excel(liveExcelFilePath, sheet_name=SheetName.playerDataRound2).to_json(orient='records'))
+factionDataJSONArr = json.loads(pandas.read_excel(liveExcelFilePath, sheet_name=SheetName.factionData).to_json(orient='records'))
+gameDataJSONArr = json.loads(pandas.read_excel(liveExcelFilePath, sheet_name=SheetName.gameData).to_json(orient='records'))
+userTrackerDataJSONArr = json.loads(pandas.read_excel(liveExcelFilePath, sheet_name=SheetName.userTrackerData).to_json(orient='records'))
+adminQueryDataJSONArr = json.loads(pandas.read_excel(liveExcelFilePath, sheet_name=SheetName.adminQueryData).to_json(orient='records'))
 
 # Load Database
 mainDb = DBHelper("shan-royale.sqlite")
@@ -217,6 +202,7 @@ def loadGameObject() -> Game:
     return Game(currentRound=currentRound, play=play, killEnabled=killEnabled, stickRound1=stickRound1, stickRound2=stickRound2)
 
 currentGame = loadGameObject()
+print(currentGame.toString())
 
 # Load User Tracker
 def loadUserTracker() -> dict:
@@ -226,7 +212,7 @@ def loadUserTracker() -> dict:
         newDict = {}
         state = stringToState(userTrackerDataDict[userTrackerDataKeys.state])
         newDict[userTrackerDataKeys.state] = state
-        newDict[userTrackerDataKeys.db] = DBHelper()
+        newDict[userTrackerDataKeys.db] = None
         newDict[userTrackerDataKeys.chat_id] = userTrackerDataDict[userTrackerDataKeys.chat_id]
         newDict[userTrackerDataKeys.smite_target] = userTrackerDataDict[userTrackerDataKeys.smite_target]
         newDict[userTrackerDataKeys.smite_tier] = userTrackerDataDict[userTrackerDataKeys.smite_tier]
@@ -234,6 +220,13 @@ def loadUserTracker() -> dict:
     return userTracker
 
 userTracker = loadUserTracker()
+resumeText = """Shan Royale has resumed!
+
+Please <b>type /start</b> to register yourself and begin playing again :)"""
+for userDict in userTracker.values():
+    bot.send_message(chat_id=userDict[userTrackerDataKeys.chat_id],
+        text=resumeText,
+        parse_mode='HTML')
 print(userTracker)
 
 # Load User Tracker
@@ -306,14 +299,26 @@ def saveGameState():
     userTrackerJSON = pandas.DataFrame.from_dict(dummyTrackerDict, orient="index")
     adminQueryJSON = pandas.DataFrame.from_dict(dummyAdminDict, orient="index")
 
-    saveFilePath = f"./excel/backup/shanRoyale2022-{currentTime}.xlsx"
-    with pandas.ExcelWriter(saveFilePath) as writer:
+    # Save to backup sheet
+    saveBackupFilePath = f"./excel/backup/shanRoyale2022-{currentTime}.xlsx"
+    with pandas.ExcelWriter(saveBackupFilePath) as writer:
         allPlayerData1JSON.to_excel(writer, sheet_name=SheetName.playerDataRound1)
         allPlayerData2JSON.to_excel(writer, sheet_name=SheetName.playerDataRound2)
         allFactionDataJSON.to_excel(writer, sheet_name=SheetName.factionData)
         gameDataJSON.to_excel(writer, sheet_name=SheetName.gameData)
         userTrackerJSON.to_excel(writer, sheet_name=SheetName.userTrackerData)
         adminQueryJSON.to_excel(writer, sheet_name=SheetName.adminQueryData)
+
+    # Save to live excel sheet too
+    with pandas.ExcelWriter(liveExcelFilePath) as writer:
+        allPlayerData1JSON.to_excel(writer, sheet_name=SheetName.playerDataRound1)
+        allPlayerData2JSON.to_excel(writer, sheet_name=SheetName.playerDataRound2)
+        allFactionDataJSON.to_excel(writer, sheet_name=SheetName.factionData)
+        gameDataJSON.to_excel(writer, sheet_name=SheetName.gameData)
+        userTrackerJSON.to_excel(writer, sheet_name=SheetName.userTrackerData)
+        adminQueryJSON.to_excel(writer, sheet_name=SheetName.adminQueryData)
+
+    print(f"DONE SAVING GAME STATE")
  
 # ====================== Admin Commands ===============================
 
@@ -850,7 +855,8 @@ Please contact @praveeeenk if the problem persists."""
             "state": None,
             "db": db,
             "chat_id": update.message.chat.id,
-            "smite_target": ""
+            "smite_target": "",
+            "smite_tier": ""
         }
         userTracker[username] = newUserTracker
     else:
@@ -1226,6 +1232,14 @@ def handleKill(update, context, victimUsername):
                          parse_mode='HTML')
         return
 
+    if victimUsername == username:
+        setState(username, None)
+        fullText = f"You may not eliminate yourself using stick or sash!\n\n{dontWasteMyTimeText}"
+        bot.send_message(chat_id=userTracker[username]["chat_id"],
+                         text=fullText,
+                         parse_mode='HTML')
+        return
+
     valid = validUsername(update, context, victimUsername)
     if not valid:
         return
@@ -1424,7 +1438,7 @@ def wrongKill(update, context, killerUsername, victimUsername):
 
 Ummmmmm...
 
-{killerFullname} (@{killerUsername}) tried to <b>wrongly eliminated</b> their faction mate, {victimFullname} (@{victimUsername}) by sash/stick!
+{killerFullname} (@{killerUsername}) tried to <b>wrongly eliminate</b> their faction mate, {victimFullname} (@{victimUsername}) by sash/stick!
 
 Please settle your internal rivalry guys..."""
         killerFactionMembers = userDb.getFactionMemberUsernames(

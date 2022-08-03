@@ -3,7 +3,7 @@
 ## Feedback
 - database is locked: eliminate got issue
 - Admin pause game/resume game?
-- change command descriptions
+- prevent suicide
 
 
 # Should i do?
