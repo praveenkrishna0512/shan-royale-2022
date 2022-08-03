@@ -6,6 +6,7 @@ import json
 import logging
 from operator import index
 from os import kill
+import os
 import random
 from sqlite3 import Time
 from subprocess import call
@@ -146,6 +147,7 @@ class OptionIDEnum(enum.Enum):
     smiteAskFaction = "eliminationAskFaction"
     adminAddPoints = "adminAddPoints"
     adminBroadcast = "adminBroadcast"
+    adminExit = "adminExit"
     smiteAskTier = "smiteAskTier"
 
 # ======================LOAD GAME STATE================================
@@ -220,13 +222,6 @@ def loadUserTracker() -> dict:
     return userTracker
 
 userTracker = loadUserTracker()
-resumeText = """Shan Royale has resumed!
-
-Please <b>type /start</b> to register yourself and begin playing again :)"""
-for userDict in userTracker.values():
-    bot.send_message(chat_id=userDict[userTrackerDataKeys.chat_id],
-        text=resumeText,
-        parse_mode='HTML')
 print(userTracker)
 
 # Load User Tracker
@@ -263,11 +258,12 @@ def makeInlineKeyboard(lst, optionID):
 # ============================DB to file converters?===========================
 
 def saveGameState():
+    db = DBHelper("shan-royale.sqlite")
     currentTime = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
     print(f"SAVING GAME STATE AT: {currentTime}")
-    allPlayerData1Dict = mainDb.getALLPlayerDataJSON(1)
-    allPlayerData2Dict = mainDb.getALLPlayerDataJSON(2)
-    allFactionDataDict = mainDb.getALLFactionDataJSON()
+    allPlayerData1Dict = db.getALLPlayerDataJSON(1)
+    allPlayerData2Dict = db.getALLPlayerDataJSON(2)
+    allFactionDataDict = db.getALLFactionDataJSON()
     
     gameDataDict = {}
     dummyDict = {}
@@ -660,7 +656,7 @@ def handleAdminBroadcast(update, context, text):
         StateEnum.adminBroadcast: text
     }
 
-    fullText = f"Is this okay sir/maam?\n\n{text}'"
+    fullText = f"Is this okay sir/maam?\n\n{text}"
     bot.send_message(chat_id=update.message.chat.id,
                      text=fullText,
                      reply_markup=makeInlineKeyboard(
@@ -699,9 +695,45 @@ def pumpAdminBroadcast(update, context, yesNo):
     setState(username, None)
     return
 
-# TODO
-def adminPause(update, context):
-    return
+def adminExit(update, context):
+    username = update.message.chat.username
+    isAdmin = checkAdmin(update, context, username)
+    if not isAdmin:
+        return
+
+    fullText = f"""You are about to END the bot.
+
+Are you sure you want to continue?"""
+    bot.send_message(chat_id=update.message.chat.id,
+                     text=fullText,
+                     reply_markup=makeInlineKeyboard(
+                         yesNoList, OptionIDEnum.adminExit),
+                     parse_mode='HTML')
+
+def handleAdminExit(update, context, yesNo):
+    username = update.callback_query.message.chat.username
+    chat_id = update.callback_query.message.chat.id
+    message_id = update.callback_query.message.message_id
+    isAdmin = checkAdmin(update, context, username, callback=True)
+    if not isAdmin:
+        return
+
+    if yesNo == yesNoList[1]:
+        # "No" was pressed
+        bot.edit_message_text(chat_id=chat_id,
+                              text=dontWasteMyTimeText,
+                              message_id=message_id,
+                              parse_mode='HTML')
+        return
+
+    fullText = "<b>Bot will now shut down. :(</b>"
+    bot.edit_message_text(chat_id=chat_id,
+                            text=fullText,
+                            message_id=message_id,
+                            parse_mode='HTML')
+
+    saveGameState()
+    os._exit(0)
 
 # ===========================Safety Officer Comands===========================================
 
@@ -1258,7 +1290,7 @@ def handleKill(update, context, victimUsername):
     setState(username, None)
 
 
-def stickCmd(update, context):
+def stickCmd(update, context ):
     eliminationPhase = checkEliminationPhase(update, context)
     if not eliminationPhase:
         return
@@ -2555,6 +2587,9 @@ def mainCallBackHandler(update, context):
     if optionID == str(OptionIDEnum.adminBroadcast):
         pumpAdminBroadcast(update, context, value)
         return
+    if optionID == str(OptionIDEnum.adminExit):
+        handleAdminExit(update, context, value)
+        return
     else:
         print(
             f'ERROR IN CALLBACKHANDLER: No such optionID defined ({optionID})\nValue: {value}')
@@ -2755,6 +2790,7 @@ def main():
     dp.add_handler(CommandHandler("adminfactiondetails", adminFactionDetails))
     dp.add_handler(CommandHandler("adminaddpoints", adminAddPoints))
     dp.add_handler(CommandHandler("adminbroadcast", adminBroadcast))
+    dp.add_handler(CommandHandler("adminExit", adminExit))
     # dp.add_handler(CommandHandler("adminpause", adminPause))
     # dp.add_handler(CommandHandler("adminresume", adminResume))
 
@@ -2818,7 +2854,7 @@ def main():
     updater.start_polling()
 
     # Save Excel sheet every 60s
-    timeout = 60.0
+    timeout = 240
     l = task.LoopingCall(saveGameState)
     l.start(timeout)
     reactor.run()

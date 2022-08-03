@@ -2,8 +2,7 @@
 
 ## Feedback
 - database is locked: eliminate got issue
-- Admin pause game/resume game?
-- prevent suicide
+- Predator command will likely CHANGED
 
 
 # Should i do?
