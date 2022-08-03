@@ -95,8 +95,8 @@ imageExtension = ".jpg"
 
 # TODO: UPDATE
 admins = ["praveeeenk", "Casperplz"]
-gameMasters = ["praveeeenk", "Casperplz", "ddannyiel"]
-safetyOfficers = ["praveeeenk", "Casperplz", "ddannyiel", "Jobeet"]
+gameMasters = ["buttermebuns", "vigonometry", "kelsomebody", "jacindatsen", "keziakhoo", "jodytng"]
+safetyOfficers = ["kelsykoh", "ddannyiel", "Jobeet"]
 
 # TODO: LOAD UPON RESUME
 # "username": { <state>: <text> }
@@ -110,9 +110,9 @@ wrongKillPenalty = 50
 
 # TODO: ASK CASPER IF OKAY, INFORM CASPER IF NEED BE SHORTER
 easyPreyNumToSelect = 2
-easyPreyTopCut = 5
-mediumPreyNumToSelect = 10
-mediumPreyTopCut = 5
+easyPreyTopCut = 3
+mediumPreyNumToSelect = 6
+mediumPreyTopCut = 3
 hardPreyNumToSelect = 3
 maxStickPerRound = 10
 stickExpiryInSecs = 600
@@ -144,7 +144,7 @@ class OptionIDEnum(enum.Enum):
     visitInfoCentre = "visitInfoCentre"
     easyPredator = "easyPredator"
     easyPrey = "easyPrey"
-    mediumPredator = "mediumPredator"
+    mediumPredator= "mediumPredator"
     mediumPrey = "mediumPrey"
     hardPredator = "hardPredator"
     hardPrey = "hardPrey"
@@ -1543,12 +1543,12 @@ def handleVisitInfoCentre(update, context, yesNo):
 Faction Name (ID): {factionsMap[str(playerFaction)]} ({playerFaction})
 
 Show this pass to the game master to proceed with the station activities."""
+    bot.send_photo(chat_id=chat_id,
+                         photo=open("./images/green-pass.jpg", 'rb'))
     bot.edit_message_text(chat_id=chat_id,
                           text=fullText,
                           message_id=message_id,
                           parse_mode='HTML')
-    bot.send_photo(chat_id=chat_id,
-                         photo=open("./images/green-pass.jpg", 'rb'))
 
 
 def visitedInfoCentre(update, context, username):
@@ -1769,7 +1769,7 @@ def handleMediumPrey(update, context, faction):
     if not eliminationPhase:
         return
     username = update.callback_query.message.chat.username
-    gameMaster = checkGameMaster(update, context, username)
+    gameMaster = checkGameMaster(update, context, username, callback=True)
     if not gameMaster:
         return
 
@@ -2602,8 +2602,9 @@ def checkGameMaster(update, context, username, callback=False):
         chat_id = update.callback_query.message.chat.id
     else:
         chat_id = update.message.chat.id
-    if username in gameMasters:
+    if username in gameMasters or username in admins:
         return True
+        
 
     fullText = f"You are not GameMaster!\n\n{dontWasteMyTimeText}"
     bot.send_message(chat_id= update.message.chat.id,
@@ -2613,7 +2614,7 @@ def checkGameMaster(update, context, username, callback=False):
 
 
 def checkSafety(update, context, username):
-    if username in safetyOfficers:
+    if username in safetyOfficers or username in gameMasters or username in admins:
         return True
 
     fullText = f"You are not Safety!\n\n{dontWasteMyTimeText}"
