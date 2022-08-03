@@ -8,6 +8,7 @@ from operator import index
 from os import kill
 import random
 from sqlite3 import Time
+from subprocess import call
 from tabnanny import check
 import time
 from tracemalloc import BaseFilter
@@ -666,7 +667,7 @@ def pumpAdminBroadcast(update, context, yesNo):
     username = update.callback_query.message.chat.username
     chat_id = update.callback_query.message.chat.id
     message_id = update.callback_query.message.message_id
-    isAdmin = checkAdmin(update, context, username)
+    isAdmin = checkAdmin(update, context, username, callback=True)
     if not isAdmin:
         return
 
@@ -1299,7 +1300,7 @@ def checkStick(update, context, username):
     expiredForTime = currentTime - playerStickExpiry
     if expiredForTime > 0:
         fullText = f"Your stick <b>expired at {datetime.fromtimestamp(playerStickExpiry)}</b>!\n\n(If the time seems inaccurate, its because it may be in GMT+0. If so, add 8 hours to the stated time.)"
-        bot.send_message(chat_id=update.message.chat.id,
+        bot.send_message(chat_id=userTracker[username]["chat_id"],
                          text=fullText,
                          parse_mode='HTML')
         return False
@@ -1326,7 +1327,7 @@ def checkVictimDying(update, context, username):
         fullText = f"""Victim has not declared themselves dying!
 
 <b>Ask the victim to enter /dying</b> on their phone first! After which, you may type <b>/eliminate</b> again."""
-        bot.send_message(chat_id=update.message.chat.id,
+        bot.send_message(chat_id=userTracker[username]["chat_id"],
                          text=fullText,
                          parse_mode='HTML')
         return False
@@ -1596,7 +1597,7 @@ def handleEasyPredator(update, context, faction):
     if not eliminationPhase:
         return
     username = update.callback_query.message.chat.username
-    gameMaster = checkGameMaster(update, context, username)
+    gameMaster = checkGameMaster(update, context, username, callback=True)
     if not gameMaster:
         return
 
@@ -1648,7 +1649,7 @@ def handleEasyPrey(update, context, faction):
     if not eliminationPhase:
         return
     username = update.callback_query.message.chat.username
-    gameMaster = checkGameMaster(update, context, username)
+    gameMaster = checkGameMaster(update, context, username, callback=True)
     if not gameMaster:
         return
 
@@ -1724,7 +1725,7 @@ def handleMediumPredator(update, context, faction):
     if not eliminationPhase:
         return
     username = update.callback_query.message.chat.username
-    gameMaster = checkGameMaster(update, context, username)
+    gameMaster = checkGameMaster(update, context, username, callback=True)
     if not gameMaster:
         return
 
@@ -1847,7 +1848,7 @@ def handleHardPredator(update, context, faction):
     if not eliminationPhase:
         return
     username = update.callback_query.message.chat.username
-    gameMaster = checkGameMaster(update, context, username)
+    gameMaster = checkGameMaster(update, context, username, callback=True)
     if not gameMaster:
         return
 
@@ -1899,7 +1900,7 @@ def handleHardPrey(update, context, faction):
     if not eliminationPhase:
         return
     username = update.callback_query.message.chat.username
-    gameMaster = checkGameMaster(update, context, username)
+    gameMaster = checkGameMaster(update, context, username, callback=True)
     if not gameMaster:
         return
 
@@ -2547,7 +2548,11 @@ def mainCallBackHandler(update, context):
 
 # =========================Game Phase Checkers=========================
 
-def checkSetPointsPhase(update, context):
+def checkSetPointsPhase(update, context, callback=False):
+    if callback:
+        chat_id = update.callback_query.message.chat.id
+    else:
+        chat_id = update.message.chat.id
     if (not currentGame.play) or currentGame.killEnabled:
         fullText = f"Set points phase has not started yet!\n\n{dontWasteMyTimeText}"
         bot.send_message(chat_id= update.message.chat.id,
@@ -2586,9 +2591,14 @@ def checkPlayPhase(update, context, callback=False):
 
 # =========================Authentication helpers=======================
 
-def checkAdmin(update, context, username):
+def checkAdmin(update, context, username, callback=False):
     if username in admins:
         return True
+
+    if callback:
+        chat_id = update.callback_query.message.chat.id
+    else:
+        chat_id = update.message.chat.id
 
     fullText = f"You are not admin!\n\n{dontWasteMyTimeText}"
     bot.send_message(chat_id= update.message.chat.id,
@@ -2613,10 +2623,14 @@ def checkGameMaster(update, context, username, callback=False):
     return False
 
 
-def checkSafety(update, context, username):
+def checkSafety(update, context, username, callback=False):
     if username in safetyOfficers or username in gameMasters or username in admins:
         return True
 
+    if callback:
+        chat_id = update.callback_query.message.chat.id
+    else:
+        chat_id = update.message.chat.id
     fullText = f"You are not Safety!\n\n{dontWasteMyTimeText}"
     bot.send_message(chat_id= update.message.chat.id,
                      text= fullText,
