@@ -937,6 +937,7 @@ def helpCmd(update, context):
 <b>/adminfactiondetails</b> - Get summary of all faction details
 <b>/adminaddpoints</b> - Add points to a faction's bank
 <b>/adminbroadcast</b> - Broadcast a message
+<b>/adminexit</b> - Shut down the bot :O
 """
 
     fullText = "<b>COMMANDS</b>"
@@ -2311,6 +2312,8 @@ Their points have been <b>reset to {minPoints}</b>.
     bot.send_message(chat_id=chat_id,
                         text=GMtext,
                         parse_mode='HTML')
+    
+    
 
 
 # Smite only Predator faction
@@ -2853,8 +2856,8 @@ def main():
     # start_polling() is non-blocking and will stop the bot gracefully.
     updater.start_polling()
 
-    # Save Excel sheet every 60s
-    timeout = 240
+    # Save Excel sheet every 90s
+    timeout = 60
     l = task.LoopingCall(saveGameState)
     l.start(timeout)
     reactor.run()

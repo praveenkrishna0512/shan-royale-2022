@@ -2,20 +2,25 @@
 
 ## Feedback
 - database is locked: eliminate got issue
-- Predator command will likely CHANGED
+- update image of play area
+- update timing of round
+
+## MUST DRY RUN
+- Pause, Restart (MUST COMMENT OUT PURGE, SETUP, AND LOADING DATA)
+- three elimination commands
+- spam bot
+
+## BEFORE BEGINNING GAME
+- Delete database
+- Ensure excel file path is correct
+- Run the script :)
 
 
-# Should i do?
+## Should i do?
 - printerror messages to PRAVEEN
 - add more pics!!
 
-
-# MUST DRY RUN
-- Pause, Restart (MUST COMMENT OUT PURGE, SETUP, AND LOADING DATA)
-- three elimination commands
-
-
-# DONE TASKS
+## DONE TASKS
 - db to excel sheet
 - replace kill with eliminate; say with what (sash, stick, smite)
 - change check stick to what is left, the number
