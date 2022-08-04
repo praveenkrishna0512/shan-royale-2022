@@ -84,9 +84,9 @@ roundList = [1, 2]
 yesNoList = ["Yes", "No"]
 
 factionsMap = {
-    "1": "Sparta",
-    "2": "Hades",
-    "3": "Aphrodite"
+    "1": "Rock",
+    "2": "Paper",
+    "3": "Scissors"
     # "4": "Nemesis"
 }
 smiteTiersArr = ["Orange", "Green", "Pink", "Cancel"]
@@ -110,7 +110,7 @@ easyPreyTopCut = 3
 mediumPreyNumToSelect = 6
 mediumPreyTopCut = 3
 hardPreyNumToSelect = 3
-maxStickPerRound = 9999
+maxStickPerRound = 9999999
 stickExpiryInSecs = 600
 
 # =============================Texts==========================================
@@ -416,8 +416,13 @@ Once that is done, please type /adminEndSetPoints again.\n\n{dontWasteMyTimeText
 
     
     # blastImageToAll(f"{playAreaImagePath}{currentGame.currentRound}{imageExtension}")
+    # print("END SET POINTS BLAST MSG")
     for username, user in userTracker.items():
-        targetFaction = getTargetFaction(username)
+        # print(username)
+        userDb = userTracker[username]["db"]
+        if userDb == None:
+            userDb = DBHelper()
+        targetFaction = getTargetFaction(username, userDb)
         text = f"""<b>NOTICE</b>
 Round {currentGame.currentRound} has begun!!
 
@@ -864,7 +869,10 @@ def startCmd(update, context):
 
     # Create database (this is required to ensure multiple ppl dont use the same db object)
     db = DBHelper()
-    userExists = db.checkUsernameInDB(username)
+    if username in safetyOfficers or username in gameMasters or username in admins:
+        userExists = True
+    else:
+        userExists = db.checkUsernameInDB(username)
     if not userExists:
         errorText = """Your username is <b>NOT in the database</b>. If you have changed your username after registering for TSE, please change your username back and try /start again.\n\n
 Please contact @praveeeenk if the problem persists."""
@@ -1172,7 +1180,7 @@ def dyingCmd(update, context):
     immune = checkImmunity(update, context, username)
     if immune:
         return
-
+    # print("fulltext")
     fullText = f"""/dying should only be entered <b>once you have been "eliminated" in person by someone else.</b>
 
 Press yes if you wish to proceed."""
@@ -1382,7 +1390,7 @@ def checkVictimDying(update, context, username):
 
 def checkVictimInPreyFaction(killerUsername, victimUsername):
     userDb = userTracker[killerUsername]["db"]
-    killerTargetFaction = getTargetFaction(killerUsername)
+    killerTargetFaction = getTargetFaction(killerUsername, userDb)
     victimFaction = userDb.getPlayerFaction(
         victimUsername, currentGame.currentRound)
     if int(killerTargetFaction) == int(victimFaction):
@@ -2716,8 +2724,7 @@ def checkSafetyBreaches(update, context, callback=False):
 
 # ======================Getters=================================
 
-def getTargetFaction(username):
-    userDb = userTracker[username]["db"]
+def getTargetFaction(username, userDb):
     return userDb.getTargetFaction(username, currentGame.currentRound)
 
 
