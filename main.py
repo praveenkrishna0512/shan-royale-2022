@@ -432,6 +432,7 @@ You are now in the <b>Elimination</b> phase
 - Duration: about <b>30 mins</b>
 - Your target Faction is <b>{targetFaction}</b>
 - Play area: <b>ERC + Utown Green + RC Entrance Walkway.</b> Please do not cross into high foot traffic areas as mentioned in the brief :)
+- IN CASE OF WET WEATHER -- <b>We will only play in all covered walkways of UTown.</b>
 
 Stay safe while playing! Don't run on stairs + high areas and not into people. Remember that this is <b>just a game</b>\n
 Enjoy!"""
