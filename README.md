@@ -2,8 +2,6 @@
 
 ## Feedback
 - database is locked: eliminate got issue
-- update image of play area
-- update timing of round
 
 ## MUST DRY RUN
 - Pause, Restart (MUST COMMENT OUT PURGE, SETUP, AND LOADING DATA)

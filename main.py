@@ -110,7 +110,7 @@ easyPreyTopCut = 3
 mediumPreyNumToSelect = 6
 mediumPreyTopCut = 3
 hardPreyNumToSelect = 3
-maxStickPerRound = 10
+maxStickPerRound = 9999
 stickExpiryInSecs = 600
 
 # =============================Texts==========================================
@@ -359,7 +359,7 @@ You are now in the <b>Set Points</b> phase
 - Elimination is now <b>disabled</b>. You will be notified when the Elimination phase begins
 
 Enjoy!"""
-    blastImageToAll(f"{playAreaImagePath}{round_no}{imageExtension}")
+    # blastImageToAll(f"{playAreaImagePath}{round_no}{imageExtension}")
     blastMessageToAll(blastText)
 
 
@@ -415,7 +415,7 @@ Once that is done, please type /adminEndSetPoints again.\n\n{dontWasteMyTimeText
                           parse_mode='HTML')
 
     
-    blastImageToAll(f"{playAreaImagePath}{currentGame.currentRound}{imageExtension}")
+    # blastImageToAll(f"{playAreaImagePath}{currentGame.currentRound}{imageExtension}")
     for username, user in userTracker.items():
         # TODO Add in pic of play area
         targetFaction = getTargetFaction(username)
@@ -425,9 +425,9 @@ Round {currentGame.currentRound} has begun!!
 You are now in the <b>Elimination</b> phase
 
 <b>Details of phase:</b>
-- Duration: <b>45 mins</b>
+- Duration: about <b>30 mins</b>
 - Your target Faction is <b>{targetFaction}</b>
-- <b>Picture of play area is attached!</b>
+- Play area: <b>ERC + Utown Green + RC Entrance Walkway.</b> Please do not cross into high foot traffic areas as mentioned in the brief :)
 
 Stay safe while playing! Don't run on stairs + high areas and not into people. Remember that this is <b>just a game</b>\n
 Enjoy!"""
