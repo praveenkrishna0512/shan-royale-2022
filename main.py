@@ -86,8 +86,8 @@ yesNoList = ["Yes", "No"]
 factionsMap = {
     "1": "Sparta",
     "2": "Hades",
-    "3": "Aphrodite",
-    "4": "Nemesis"
+    "3": "Aphrodite"
+    # "4": "Nemesis"
 }
 smiteTiersArr = ["Orange", "Green", "Pink", "Cancel"]
 playAreaImagePath = "./images/shan-royale-playarea-round-"
@@ -95,14 +95,14 @@ imageExtension = ".jpg"
 
 # TODO: UPDATE
 admins = ["praveeeenk", "Casperplz"]
-gameMasters = ["buttermebuns", "vigonometry", "kelsomebody", "jacindatsen", "keziakhoo", "jodytng"]
+gameMasters = ["buttermebuns", "kelsomebody", "jacindatsen"]
 safetyOfficers = ["kelsykoh", "ddannyiel", "Jobeet"]
 
 minPoints = 5
 maxTeamPoints = 200
 highestAllowedSafetyBreach = 2
 immuneSecondsUponDeath = 90
-wrongKillPenalty = 50
+wrongKillPenalty = 100
 
 # TODO: ASK CASPER IF OKAY, INFORM CASPER IF NEED BE SHORTER
 easyPreyNumToSelect = 2
@@ -152,7 +152,7 @@ class OptionIDEnum(enum.Enum):
 
 # ======================LOAD GAME STATE================================
 # TODO: CHANGE TO ACTUAL EXCEL SHEET
-liveExcelFilePath = "./excel/test/shanRoyale2022Data1.xlsx"
+liveExcelFilePath = "./excel/shanRoyale2022DataLIVE.xlsx"
 playerDataRound1JSONArr = json.loads(pandas.read_excel(liveExcelFilePath, sheet_name=SheetName.playerDataRound1).to_json(orient='records'))
 playerDataRound2JSONArr = json.loads(pandas.read_excel(liveExcelFilePath, sheet_name=SheetName.playerDataRound2).to_json(orient='records'))
 factionDataJSONArr = json.loads(pandas.read_excel(liveExcelFilePath, sheet_name=SheetName.factionData).to_json(orient='records'))
@@ -417,7 +417,6 @@ Once that is done, please type /adminEndSetPoints again.\n\n{dontWasteMyTimeText
     
     # blastImageToAll(f"{playAreaImagePath}{currentGame.currentRound}{imageExtension}")
     for username, user in userTracker.items():
-        # TODO Add in pic of play area
         targetFaction = getTargetFaction(username)
         text = f"""<b>NOTICE</b>
 Round {currentGame.currentRound} has begun!!
@@ -1720,7 +1719,6 @@ def handleEasyPrey(update, context, faction):
         numPreyToSelect = numPreyLeft
 
     # RAndom num avoids top ppl specified by tier1bTopCut
-    # TODO: If num left < tier1bTopCut, this results in a loop
     randomNumArray = []
     for i in range(numPreyToSelect):
         random_num = random.randint(easyPreyTopCut, numPreyToSelect)
@@ -1841,7 +1839,6 @@ def handleMediumPrey(update, context, faction):
         numPreyToSelect = numPreyLeft
 
     # RAndom num avoids top ppl specified by tier2bTopCut
-    # TODO: If num left < tier1bTopCut, this results in a loop
     randomNumArray = []
     for i in range(numPreyToSelect):
         random_num = random.randint(mediumPreyTopCut, numPreyToSelect)
@@ -2180,6 +2177,7 @@ Please state the <b>ID of the faction</b> of the player requesting the smite.
 
 
 def handleSmite(update, context, killerFaction):
+    print(f"HANDLING SMITE FOR FACTION {killerFaction}")
     username = update.callback_query.message.chat.username
     victimUsername = userTracker[username]["smite_target"]
     tier = userTracker[username]["smite_tier"]
@@ -2214,6 +2212,8 @@ def handleSmite(update, context, killerFaction):
         smiteOrangeKill(update, context, killerFaction, victimUsername)
     elif tier == "Pink":
         smitePinkKill(update, context, killerFaction, victimUsername)
+    else:
+        print(f"NO SUCH TIER: {tier}")
 
     userTracker[username]["smite_target"] = ""
     userTracker[username]["smite_tier"] = ""
@@ -2222,15 +2222,15 @@ def handleSmite(update, context, killerFaction):
 
 # Smite only Prey faction
 def smiteOrangeKill(update, context, killerFaction, victimUsername):
-    username = update.callback_query.message.chat.username
-    userDb = userTracker[username]["db"]
+    GMusername = update.callback_query.message.chat.username
+    userDb = userTracker[GMusername]["db"]
     victimData = userDb.getPlayerDataJSON(
         victimUsername, currentGame.currentRound)
 
     victimFaction = victimData[playerDataKeys.faction]
     killerFactionData = userDb.getFactionDataJSON(killerFaction)
 
-    isPrey = checkVictimInPreyFactionFromFaction(username, killerFaction, victimUsername)
+    isPrey = checkVictimInPreyFactionFromFaction(GMusername, killerFaction, victimUsername)
     if not isPrey:
         # Blast message to killer's faction
         killerFactionText = f"""<b>{factionsMap[str(killerFaction)]} Faction Update</b>
@@ -2242,10 +2242,13 @@ Someone from your faction tried to use a smite note, but to no avail! The note h
 ~ Shan Royale 2022 Team"""
         killerFactionMembers = userDb.getFactionMemberUsernames(
             killerFaction, currentGame.currentRound)
+        print("SmiteORANGE: Sending killer faction FAILED messages")
+        print(killerFactionMembers)
         for killerUsername in killerFactionMembers:
             if killerUsername not in userTracker.keys():
                 continue
-            chat_id = userTracker[username]["chat_id"]
+            chat_id = userTracker[killerUsername]["chat_id"]
+            print(chat_id)
             bot.send_message(chat_id=chat_id,
                             text=killerFactionText,
                             parse_mode='HTML')
@@ -2274,10 +2277,12 @@ Points added to faction bank: <b>{pointsToAdd}pts</b>
 Current faction bank balance: <b>{killerFactionData[factionDataKeys.bank]}pts</b>."""
     killerFactionMembers = userDb.getFactionMemberUsernames(
         killerFaction, currentGame.currentRound)
+    print("SmiteORANGE: Sending killer faction messages")
     for killerUsername in killerFactionMembers:
         if killerUsername not in userTracker.keys():
             continue
-        chat_id = userTracker[username]["chat_id"]
+        chat_id = userTracker[killerUsername]["chat_id"]
+        print(chat_id)
         bot.send_message(chat_id=chat_id,
                          text=killerFactionText,
                          parse_mode='HTML')
@@ -2292,10 +2297,12 @@ Their points have been <b>reset to {minPoints}</b>.
 <b>Note:</b> The victim, {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}), is <b>NOT immune from subsequent eliminations</b>."""
     victimFactionMembers = userDb.getFactionMemberUsernames(
         victimFaction, currentGame.currentRound)
+    print("SmiteORANGE: Sending victim faction messages")
     for victimUsername in victimFactionMembers:
         if victimUsername not in userTracker.keys():
             continue
         chat_id = userTracker[victimUsername]["chat_id"]
+        print(chat_id)
         bot.send_message(chat_id=chat_id,
                          text=victimFactionText,
                          parse_mode='HTML')
@@ -2308,25 +2315,25 @@ Their points have been <b>reset to {minPoints}</b>.
 Their points have been <b>reset to {minPoints}</b>.
 
 <b>Note:</b> The victim, {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}), is <b>NOT immune from subsequent eliminations</b>."""
-    chat_id = userTracker[username]["chat_id"]
+    print("SmiteORANGE: Sending GM message")
+    chat_id = userTracker[GMusername]["chat_id"]
+    print(chat_id)
     bot.send_message(chat_id=chat_id,
                         text=GMtext,
                         parse_mode='HTML')
     
     
-
-
 # Smite only Predator faction
 def smiteGreenKill(update, context, killerFaction, victimUsername):
-    username = update.callback_query.message.chat.username
-    userDb = userTracker[username]["db"]
+    GMusername = update.callback_query.message.chat.username
+    userDb = userTracker[GMusername]["db"]
     victimData = userDb.getPlayerDataJSON(
         victimUsername, currentGame.currentRound)
 
     victimFaction = victimData[playerDataKeys.faction]
     killerFactionData = userDb.getFactionDataJSON(killerFaction)
 
-    isPredator = checkVictimInPredatorFactionFromFaction(username, killerFaction, victimUsername)
+    isPredator = checkVictimInPredatorFactionFromFaction(GMusername, killerFaction, victimUsername)
     if not isPredator:
         # Blast message to killer's faction
         killerFactionText = f"""<b>{factionsMap[str(killerFaction)]} Faction Update</b>
@@ -2341,7 +2348,7 @@ Someone from your faction tried to use a smite note, but to no avail! The note h
         for killerUsername in killerFactionMembers:
             if killerUsername not in userTracker.keys():
                 continue
-            chat_id = userTracker[username]["chat_id"]
+            chat_id = userTracker[killerUsername]["chat_id"]
             bot.send_message(chat_id=chat_id,
                             text=killerFactionText,
                             parse_mode='HTML')
@@ -2373,7 +2380,7 @@ Current faction bank balance: <b>{killerFactionData[factionDataKeys.bank]}pts</b
     for killerUsername in killerFactionMembers:
         if killerUsername not in userTracker.keys():
             continue
-        chat_id = userTracker[username]["chat_id"]
+        chat_id = userTracker[killerUsername]["chat_id"]
         bot.send_message(chat_id=chat_id,
                          text=killerFactionText,
                          parse_mode='HTML')
@@ -2404,7 +2411,7 @@ Their points have been <b>reset to {minPoints}</b>.
 Their points have been <b>reset to {minPoints}</b>.
 
 <b>Note:</b> The victim, {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}), is <b>NOT immune from subsequent eliminations</b>."""
-    chat_id = userTracker[username]["chat_id"]
+    chat_id = userTracker[GMusername]["chat_id"]
     bot.send_message(chat_id=chat_id,
                         text=GMtext,
                         parse_mode='HTML')
@@ -2412,8 +2419,8 @@ Their points have been <b>reset to {minPoints}</b>.
 
 # Smite EVERYBODY
 def smitePinkKill(update, context, killerFaction, victimUsername):
-    username = update.callback_query.message.chat.username
-    userDb = userTracker[username]["db"]
+    GMusername = update.callback_query.message.chat.username
+    userDb = userTracker[GMusername]["db"]
     victimData = userDb.getPlayerDataJSON(
         victimUsername, currentGame.currentRound)
 
@@ -2446,7 +2453,7 @@ Current faction bank balance: <b>{killerFactionData[factionDataKeys.bank]}pts</b
     for killerUsername in killerFactionMembers:
         if killerUsername not in userTracker.keys():
             continue
-        chat_id = userTracker[username]["chat_id"]
+        chat_id = userTracker[killerUsername]["chat_id"]
         bot.send_message(chat_id=chat_id,
                          text=killerFactionText,
                          parse_mode='HTML')
@@ -2477,7 +2484,7 @@ Their points have been <b>reset to {minPoints}</b>.
 Their points have been <b>reset to {minPoints}</b>.
 
 <b>Note:</b> The victim, {victimData[playerDataKeys.fullname]} (@{victimData[playerDataKeys.username]}), is <b>NOT immune from subsequent eliminations</b>."""
-    chat_id = userTracker[username]["chat_id"]
+    chat_id = userTracker[GMusername]["chat_id"]
     bot.send_message(chat_id=chat_id,
                         text=GMtext,
                         parse_mode='HTML')
